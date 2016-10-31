@@ -8,7 +8,7 @@
 #define PIN_MQ9_HEATER  10
 #define PIN_MIC         A2
 #define PIN_VOLT        A3
-#define PIN_AMP         A4
+//#define PIN_AMP         A4
 #define PIN_RELAY       12
 #define SLEEP_DELAY     20
 
@@ -22,7 +22,7 @@ unsigned int MQ9[] = {0, 0, 0};//LPG, Methane, CarbonMonoxide (угарный г
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
 unsigned int volt = 0;
-unsigned int amp = 0;
+//unsigned int amp = 0;
 unsigned int sleeptime = 0;
 unsigned int sleep_threshold = 0;
 
@@ -75,7 +75,7 @@ void loop() {
     //volt
     volt = analogRead(PIN_VOLT);
     //amp
-    amp = analogRead(PIN_AMP);
+    //amp = analogRead(PIN_AMP);
   } else { //sleeptime < sleep_threshold
     if (relay.status()) {
       relay.off(); 
@@ -90,7 +90,6 @@ void loop() {
       sleep_threshold = 0;
     }
   }
-  
   delay(1000);
 }
 
@@ -127,10 +126,9 @@ void req() {
     MQ9[2] >> 8, MQ9[2] & 0xFF,
     mic_val >> 8, mic_val & 0xFF,
     volt >> 8, volt & 0xFF,
-    amp >> 8, amp & 0xFF,
+    //amp >> 8, amp & 0xFF,
   };
-  Wire.write(data, sizeof(data));
   mq2_val_ready = false;
   mq9_val_ready = false;
+  Wire.write(data, sizeof(data));
 }
-

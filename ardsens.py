@@ -3,7 +3,7 @@ bus = smbus.SMBus(1)
 res = {}
 
 try:
-  data = bus.read_i2c_block_data(0x05,0,18)
+  data = bus.read_i2c_block_data(0x05, 0, 20)
 
   if data[0]:
     res['gas1'] = [
@@ -20,6 +20,7 @@ try:
       data[14] << 8 | data[15]
     ]
   res['mic'] = data[16] << 8 | data[17]
+  res['volt'] = data[18] << 8 | data[19]
 except IOError:
   res['error1'] = 'IOError'
 except:
