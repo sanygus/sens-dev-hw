@@ -1,4 +1,4 @@
-import smbus, json
+import smbus, time, json
 bus = smbus.SMBus(1)
 res = {}
 
@@ -31,6 +31,9 @@ try:
   bus.write_byte_data(0x5c, 0x20, 0b10000100)
   #write value 0b1 to register 0x21 on device at address 0x5d
   bus.write_byte_data(0x5c,0x21, 0b1)
+  #delay for write values to registers (enough 0.05, 0.1 for reliability)
+  time.sleep(0.1)
+  
   Temp_LSB = bus.read_byte_data(0x5c, 0x2b)
   Temp_MSB = bus.read_byte_data(0x5c, 0x2c)
   #combine LSB & MSB
