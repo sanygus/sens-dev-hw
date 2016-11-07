@@ -23,8 +23,8 @@ boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
 unsigned int volt = 0;
 //unsigned int amp = 0;
-unsigned int sleeptime = 0;
-unsigned int sleep_threshold = 0;
+unsigned long sleeptime = 0;
+unsigned long sleep_threshold = 0;
 
 void setup()
 {
@@ -101,8 +101,8 @@ void rec(int bc) { //receive
        data[tempi] = Wire.read();
        tempi++;
      }
-     if(data[0]==1) {//sleep
-       sleeptime = data[1] << 8 | data[2];
+     if(data[0] == 1) {//sleep
+       sleeptime = (data[1] << 8 | data[2]) * 60;
        sleep_threshold = sleeptime - SLEEP_DELAY;
      }
    } else { //flush buffer

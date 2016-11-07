@@ -20,6 +20,7 @@ try:
       data[14] << 8 | data[15]
     ]
   res['mic'] = data[16] << 8 | data[17]
+  #convert to real vot values
   res['volt'] = data[18] << 8 | data[19]
 except IOError:
   res['error1'] = 'IOError'
