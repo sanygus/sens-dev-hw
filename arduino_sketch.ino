@@ -88,6 +88,8 @@ void loop() {
   } else {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
+      mq2.heaterPwrHigh();
+      mq9.cycleHeat();
     }
   }
   delay(1000);
