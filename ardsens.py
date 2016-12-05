@@ -42,13 +42,13 @@ try:
   # As value is negative convert 2's complement to decimal
   comp = count - (1 << 16)
   #calc temp according to data sheet
-  res['temp'] = round((42.5 + (comp/480.0)), 1)
+  res['temp'] = round((42.5 + (comp/480.0)), 1) - 5
 
   Pressure_XLB = bus.read_byte_data(0x5c, 0x28)
   Pressure_LSB = bus.read_byte_data(0x5c, 0x29)
   Pressure_MSB = bus.read_byte_data(0x5c, 0x2a)
   count = (Pressure_MSB << 16) | ( Pressure_LSB << 8 ) | Pressure_XLB
-  res['press'] = round(((count/4096.0)*0.75006), 1)
+  res['press'] = round(((count/4096.0)*0.75006), 1) - 10
 except IOError:
   res['error2'] = 'IOError'
 except:
