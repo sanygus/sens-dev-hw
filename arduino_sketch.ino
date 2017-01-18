@@ -1,6 +1,7 @@
 #include <Wire.h>
 #include <TroykaMQ.h>
 #include <Mic.h>
+#include <Volt.h>
 #include <Relay.h>
 #define PIN_MQ2         A0
 #define PIN_MQ2_HEATER  11
@@ -15,13 +16,13 @@
 MQ2 mq2(PIN_MQ2, PIN_MQ2_HEATER);
 MQ9 mq9(PIN_MQ9, PIN_MQ9_HEATER);
 Mic mic(PIN_MIC);
+Volt volt(PIN_VOLT);
 Relay relay(PIN_RELAY, 13);
 
 unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Methane (метан), Smoke (дым), Hydrogen (водород) in ppm
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
-unsigned int volt = 0;
 unsigned long sleeptime = 0;
 unsigned long sleep_threshold = 0;
 
@@ -72,7 +73,7 @@ void loop() {
     // mic
     mic.readNoise();
     // volt
-    volt = analogRead(PIN_VOLT);
+    volt.readVolt();
   } else { // sleeptime < sleep_threshold
     if (relay.status()) {
       relay.off(); 
@@ -116,6 +117,7 @@ void rec(int bc) { // receive
 
 void req() {
   unsigned int mic_val = mic.getNoise();
+  unsigned int volt_val = volt.getVolt();
   byte data[] = {
     mq2_val_ready,
     MQ2[0] >> 8, MQ2[0] & 0xFF,
@@ -127,7 +129,7 @@ void req() {
     MQ9[1] >> 8, MQ9[1] & 0xFF,
     MQ9[2] >> 8, MQ9[2] & 0xFF,
     mic_val >> 8, mic_val & 0xFF,
-    volt >> 8, volt & 0xFF,
+    volt_val >> 8, volt_val & 0xFF,
   };
   mq2_val_ready = false;
   mq9_val_ready = false;

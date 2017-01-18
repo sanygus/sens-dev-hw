@@ -8,7 +8,7 @@ Mic::Mic(int pin)
 
 void Mic::readNoise()
 {
-  int sum = 0;
+  unsigned int sum = 0;
   int countNotNull = 0;
   for (int i = 1; i < size_arr; i++) {
     _values[i - 1] = _values[i];

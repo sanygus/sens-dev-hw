@@ -54,5 +54,5 @@ except IOError:
 except:
   res['error2'] = 'unknown error in second block'
 
-print json.dumps(res)
+print(json.dumps(res))
 #example {"temp": 27.2, "press": 742.7, "mic": 330, "volt": 312, "gas1": [4, 11, 20, 9], "gas2": [7, 10, 5]}
