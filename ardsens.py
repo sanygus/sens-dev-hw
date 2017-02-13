@@ -6,7 +6,7 @@ try:
   ard.write(b'\x01\x00\x00')
   confirm = ard.read(1)
   if confirm[0] == 1:
-    data = ard.read(20)
+    data = ard.read(24)
     if data[0]:
       res['gas1'] = [
         data[1] << 8 | data[2],
