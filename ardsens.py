@@ -2,7 +2,7 @@ import serial, json
 res = {}
 
 try:
-  ard = serial.Serial(port='/dev/ttyACM0', baudrate=9600, timeout=5, writeTimeout=5);
+  ard = serial.Serial(port='/dev/ttyACM0', baudrate=9600, timeout=5, writeTimeout=5)
   ard.write(b'\x01\x00\x00')
   confirm = ard.read(1)
   if confirm[0] == 1:
@@ -28,7 +28,7 @@ try:
     res['error'] = "ard not understand"
     ard.flushInput()
   else:
-    res['error'] = "worng answer from ard"
+    res['error'] = "wrong answer from ard"
     ard.flushInput()
 
 except OSError:
