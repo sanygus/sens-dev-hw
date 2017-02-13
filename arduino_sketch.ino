@@ -1,4 +1,3 @@
-#include <Wire.h>
 #include <TroykaMQ.h>
 #include <Mic.h>
 #include <Volt.h>
@@ -21,6 +20,7 @@ Relay relay(PIN_RELAY, 13);
 
 unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Methane (метан), Smoke (дым), Hydrogen (водород) in ppm
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
+byte sensors[20];
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
 unsigned long sleeptime = 0;
@@ -28,10 +28,7 @@ unsigned long sleep_threshold = 0;
 
 void setup()
 {
-  //Serial.begin(9600);
-  Wire.begin(0x05);
-  Wire.onReceive(rec);
-  Wire.onRequest(req);
+  Serial.begin(9600);
   pinMode(PIN_MQ2_HEATER, OUTPUT);
   pinMode(PIN_MQ9_HEATER, OUTPUT);
   pinMode(PIN_RELAY, OUTPUT);
@@ -90,48 +87,64 @@ void loop() {
       mq9.cycleHeat();
     }
   }
+  processComm();
   delay(1000);
 }
 
-void rec(int bc) { // receive
-   if(bc==3){ // ok
-     byte data[3] = {0, 0, 0}; // 1 byte - command, 2,3 - value
-     byte tempi = 0;
-     while(Wire.available()) {
-       data[tempi] = Wire.read();
-       tempi++;
-     }
-     if(data[0] == 1) { // sleep
-       sleeptime = data[1];
-       sleeptime = sleeptime << 8;
-       sleeptime = sleeptime | data[2];
-       sleeptime *= 60;
-       sleep_threshold = sleeptime - SLEEP_DELAY;
-     }
-   } else { // flush buffer
-     while(Wire.available()) {
-       Wire.read();
-     }
-   }
+void processComm() {
+  if (Serial.available() == 3) {
+    byte command = Serial.read();//1b//1-getValues,2-doSleep
+    unsigned int commandValue = Serial.read();//2b
+    commandValue = commandValue << 8;
+    commandValue = commandValue | Serial.read();
+    switch (command) {
+      case 1:
+        Serial.write(1);
+        prepSensors();
+        Serial.write(sensors, sizeof(sensors));
+        break;
+      case 2:
+        if (commandValue > 0) {
+          sleeptime = commandValue * 60;
+          sleep_threshold = sleeptime - SLEEP_DELAY;
+          Serial.write(1);
+        } else {
+          Serial.write(2);
+        }
+        break;
+      default:
+        Serial.write(2);
+    }
+  } else if (Serial.available() > 0) {
+    while (Serial.available()) {
+      Serial.read(); 
+    }
+  }
 }
 
-void req() {
+void prepSensors() {
   unsigned int mic_val = mic.getNoise();
   unsigned int volt_val = volt.getVolt();
-  byte data[] = {
-    mq2_val_ready,
-    MQ2[0] >> 8, MQ2[0] & 0xFF,
-    MQ2[1] >> 8, MQ2[1] & 0xFF,
-    MQ2[2] >> 8, MQ2[2] & 0xFF,
-    MQ2[3] >> 8, MQ2[3] & 0xFF,
-    mq9_val_ready,
-    MQ9[0] >> 8, MQ9[0] & 0xFF,
-    MQ9[1] >> 8, MQ9[1] & 0xFF,
-    MQ9[2] >> 8, MQ9[2] & 0xFF,
-    mic_val >> 8, mic_val & 0xFF,
-    volt_val >> 8, volt_val & 0xFF,
-  };
+  sensors[0] = mq2_val_ready;
+  sensors[1] = MQ2[0] >> 8;
+  sensors[2] = MQ2[0] & 0xFF;
+  sensors[3] = MQ2[1] >> 8;
+  sensors[4] = MQ2[1] & 0xFF;
+  sensors[5] = MQ2[2] >> 8;
+  sensors[6] = MQ2[2] & 0xFF;
+  sensors[7] = MQ2[3] >> 8;
+  sensors[8] = MQ2[3] & 0xFF;
+  sensors[9] = mq9_val_ready;
+  sensors[10] = MQ9[0] >> 8;
+  sensors[11] = MQ9[0] & 0xFF;
+  sensors[12] = MQ9[1] >> 8;
+  sensors[13] = MQ9[1] & 0xFF;
+  sensors[14] = MQ9[2] >> 8;
+  sensors[15] = MQ9[2] & 0xFF;
+  sensors[16] = mic_val >> 8;
+  sensors[17] = mic_val & 0xFF;
+  sensors[18] = volt_val >> 8;
+  sensors[19] = volt_val & 0xFF;
   mq2_val_ready = false;
   mq9_val_ready = false;
-  Wire.write(data, sizeof(data));
 }
