@@ -2,6 +2,8 @@
 #include <Mic.h>
 #include <Volt.h>
 #include <Relay.h>
+#include <Wire.h>
+#include <TroykaIMU.h>
 #define PIN_MQ2         A0
 #define PIN_MQ2_HEATER  11
 #define PIN_MQ9         A1
@@ -17,10 +19,12 @@ MQ9 mq9(PIN_MQ9, PIN_MQ9_HEATER);
 Mic mic(PIN_MIC);
 Volt volt(PIN_VOLT);
 Relay relay(PIN_RELAY, 13);
+Barometer barometer;
 
 unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Methane (метан), Smoke (дым), Hydrogen (водород) in ppm
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
-byte sensors[20];
+unsigned int BarTerm[] = {0, 0};
+byte sensors[24];
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
 unsigned long sleeptime = 0;
@@ -36,6 +40,7 @@ void setup()
   mq2.heaterPwrHigh();
   mq9.cycleHeat();
   relay.on();
+  barometer.begin();
 }
 
 void loop() {
@@ -71,6 +76,9 @@ void loop() {
     mic.readNoise();
     // volt
     volt.readVolt();
+    // press, temp
+    BarTerm[0] = int(round(barometer.readPressureMillimetersHg()));
+    BarTerm[1] = int(round((barometer.readTemperatureC() + 50) * 100));
   } else { // sleeptime < sleep_threshold
     if (relay.status()) {
       relay.off(); 
@@ -145,6 +153,10 @@ void prepSensors() {
   sensors[17] = mic_val & 0xFF;
   sensors[18] = volt_val >> 8;
   sensors[19] = volt_val & 0xFF;
+  sensors[20] = BarTerm[0] >> 8;
+  sensors[21] = BarTerm[0] & 0xFF;
+  sensors[22] = BarTerm[1] >> 8;
+  sensors[23] = BarTerm[1] & 0xFF;
   mq2_val_ready = false;
   mq9_val_ready = false;
 }

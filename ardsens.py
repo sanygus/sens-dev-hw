@@ -22,6 +22,8 @@ try:
       ]
     res['mic'] = data[16] << 8 | data[17]
     res['volt'] = data[18] << 8 | data[19]
+    res['press'] = data[20] << 8 | data[21]
+    res['temp'] = ((data[22] << 8 | data[23]) / 100) - 50
   elif confirm[0] == 2:
     res['error'] = "ard not understand"
     ard.flushInput()
