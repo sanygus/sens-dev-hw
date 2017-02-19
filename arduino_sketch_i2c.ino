@@ -120,7 +120,6 @@ void loop() {
 
 void receiveHandler(int bc) {
   if (Wire.available() == 3) {
-    master_query_time = 0;
     command = Wire.read();//1b//1-getValues,2-doSleep
     commandValue = Wire.read();//2b
     commandValue = commandValue << 8;
@@ -135,10 +134,10 @@ void receiveHandler(int bc) {
 void requestHandler() {
   if (command == 1) {
     master_query_time = 0;
-    Wire.write(1);
     unsigned int mic_val = mic.getNoise();
     unsigned int volt_val = volt.getVolt();
     byte data[] = {
+      1,
       mq2_val_ready,
       MQ2[0] >> 8, MQ2[0] & 0xFF,
       MQ2[1] >> 8, MQ2[1] & 0xFF,

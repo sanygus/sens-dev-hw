@@ -3,26 +3,29 @@ bus = smbus.SMBus(1)
 res = {}
 
 try:
-  write_i2c_block_data(0x05, 1, [0, 0])
-  data = bus.read_i2c_block_data(0x05, 0, 20)
-
-  if data[0]:
-    res['gas1'] = [
-      data[1] << 8 | data[2],
-      data[3] << 8 | data[4],
-      data[5] << 8 | data[6],
-      data[7] << 8 | data[8]
-    ]
+  bus.write_i2c_block_data(0x05, 1, [0, 0])
+  data = bus.read_i2c_block_data(0x05, 0, 21)
   
-  if data[9]:
-    res['gas2'] = [
-      data[10] << 8 | data[11],
-      data[12] << 8 | data[13],
-      data[14] << 8 | data[15]
-    ]
-  res['mic'] = data[16] << 8 | data[17]
-  #convert to real vot values
-  res['volt'] = data[18] << 8 | data[19]
+  if data[0]:
+    if data[1]:
+      res['gas1'] = [
+        data[2] << 8 | data[3],
+        data[4] << 8 | data[5],
+        data[6] << 8 | data[7],
+        data[8] << 8 | data[9]
+      ]
+    
+    if data[10]:
+      res['gas2'] = [
+        data[11] << 8 | data[12],
+        data[13] << 8 | data[14],
+        data[15] << 8 | data[16]
+      ]
+    res['mic'] = data[17] << 8 | data[18]
+    #convert to real vot values
+    res['volt'] = data[19] << 8 | data[20]
+  else:
+    res['error1'] = 'unknown answer'
 except IOError:
   res['error1'] = 'IOError'
 except:
@@ -55,5 +58,6 @@ except IOError:
 except:
   res['error2'] = 'unknown error in second block'
 
+bus.close()
 print(json.dumps(res, sort_keys=True))
 #example {"temp": 27.2, "press": 742.7, "mic": 330, "volt": 312, "gas1": [4, 11, 20, 9], "gas2": [7, 10, 5]}
