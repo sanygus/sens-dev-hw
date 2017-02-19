@@ -9,6 +9,5 @@ try:
 		print(json.dumps({'success': True}))
 	elif data[0] == 2:
 		print(json.dumps({'success': False}))
-		print('ok hand err')
 except:
 	print(json.dumps({'success': False}))
