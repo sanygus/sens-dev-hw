@@ -12,12 +12,16 @@ void Mic::readNoise()
   int countNotNull = 0;
   for (int i = 1; i < size_arr; i++) {
     _values[i - 1] = _values[i];
-    if(i == (size_arr - 1)) {
-      _values[i] = analogRead(_pin);
-    }
     if (_values[i] > 0) {
       sum += _values[i];
       countNotNull++;
+    }
+    if (i == (size_arr - 1)) {
+      _values[i] = analogRead(_pin);
+      if (_values[i] > 0) {
+        sum += _values[i];
+        countNotNull++;
+      }
     }
   }
   if (countNotNull > 0) {
