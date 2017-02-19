@@ -1,4 +1,4 @@
-import smbus, json
+import smbus, time, json
 bus = smbus.SMBus(1)
 res = {}
 
