@@ -1,14 +1,13 @@
-import sys, serial, json
+import sys, smbus, json
+bus = smbus.SMBus(1)
 
 try:
 	stime = int(sys.argv[1])
-	ard = serial.Serial(port='/dev/ttyACM0', baudrate = 9600, timeout = 5, writeTimeout = 5)
-	ard.write(b'\x02' + stime.to_bytes(2, byteorder = 'big'))
-
-	confirm = ard.read(1)
-	if confirm[0] == 1:
+	bus.write_i2c_block_data(0x05, 2, [stime >> 8, stime & 0xFF])
+	data = bus.read_i2c_block_data(0x05, 0, 1)
+	if data[0] == 1:
 		print(json.dumps({'success': True}))
-	else:
+	elif data[0] == 2:
 		print(json.dumps({'success': False}))
 except:
 	print(json.dumps({'success': False}))
