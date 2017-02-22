@@ -116,6 +116,19 @@ void loop() {
     }
   }
   delay(1000);
+  blink();
+}
+
+void blink() {
+  if (relay.status()) {
+    digitalWrite(13, 1);
+    delay(100);
+    digitalWrite(13, 0);
+  } else {
+    digitalWrite(13, 0);
+    delay(100);
+    digitalWrite(13, 1);
+  }
 }
 
 void receiveHandler(int bc) {
