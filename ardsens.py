@@ -33,10 +33,11 @@ except:
 
 try:
   # power up LPS331AP pressure sensor & set BDU bit
+  # active mode
   bus.write_byte_data(0x5c, 0x20, 0b10000100)
-  #write value 0b1 to register 0x21 on device at address 0x5d
+  # reboot memory content
   bus.write_byte_data(0x5c,0x21, 0b1)
-  #delay for write values to registers (enough 0.05, 0.1 for reliability)
+  # delay for write values to registers (enough 0.05, 0.1 for reliability)
   time.sleep(0.1)
 
   Temp_LSB = bus.read_byte_data(0x5c, 0x2b)
@@ -53,6 +54,10 @@ try:
   Pressure_MSB = bus.read_byte_data(0x5c, 0x2a)
   count = (Pressure_MSB << 16) | ( Pressure_LSB << 8 ) | Pressure_XLB
   res['press'] = round(((count/4096.0)*0.75006), 1)
+  # power down
+  bus.write_byte_data(0x5c, 0x20, 0b00000100)
+  # soft reboot
+  #bus.write_byte_data(0x5c,0x21, 0b10000100)
 except IOError:
   res['error2'] = 'IOError'
 except:
