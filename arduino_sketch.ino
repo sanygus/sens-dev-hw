@@ -4,6 +4,7 @@
 #include <Volt.h>
 #include <Relay.h>
 #include <Wire.h>
+#include <GPRS_Shield_Arduino.h>
 #define PIN_MQ2         A0
 #define PIN_MQ2_HEATER  11
 #define PIN_MQ9         A1
@@ -13,6 +14,7 @@
 #define PIN_RELAY       12
 #define SLEEP_DELAY     20
 #define MASTER_QUERY_TIME_THRESHOLD 120
+#define PROCESS_PARITY_VALUE 10
 
 MQ2 mq2(PIN_MQ2, PIN_MQ2_HEATER);
 MQ9 mq9(PIN_MQ9, PIN_MQ9_HEATER);
@@ -26,9 +28,13 @@ unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Me
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
-unsigned long sleeptime = 0;
-unsigned long sleep_threshold = 0;
+unsigned long sleeptime = 120;
+unsigned long sleep_threshold = 115;
 unsigned long master_query_time = 0;
+unsigned int conn_error = 0;
+byte process_parity = 0;
+
+GPRS gprs(Serial1, 4, 5);
 
 void setup()
 {
@@ -37,20 +43,18 @@ void setup()
   Wire.onReceive(receiveHandler);
   Wire.onRequest(requestHandler);
   pinMode(13, OUTPUT);
-  digitalWrite(13, 1);
-  delay(1000);
-  digitalWrite(13, 0);
-  delay(1000);
-  digitalWrite(13, 1);
-  delay(1000);
-  digitalWrite(13, 0);
-  delay(1000);
-  digitalWrite(13, 1);
-  delay(1000);
-  digitalWrite(13, 0);
-  delay(1000);
-  wdt_enable(WDTO_4S);
-  //Serial.begin(9600);
+  gprs.powerOff();
+  digitalWrite(13, 1); delay(1000);
+  digitalWrite(13, 0); delay(1000);
+  digitalWrite(13, 1); delay(1000);
+  digitalWrite(13, 0); delay(1000);
+  digitalWrite(13, 1); delay(1000);
+  digitalWrite(13, 0); delay(1000);
+  wdt_enable(WDTO_8S);
+
+  Serial.begin(115200);
+  Serial1.begin(115200);
+
   pinMode(PIN_MQ2_HEATER, OUTPUT);
   pinMode(PIN_MQ9_HEATER, OUTPUT);
   pinMode(PIN_RELAY, OUTPUT);
@@ -104,19 +108,28 @@ void loop() {
     }
     mq2.heaterPwrOff();
     mq9.heaterPwrOff();
+    if (digitalRead(5)) {
+      process_parity++;
+      if (process_parity >= (PROCESS_PARITY_VALUE - 1)) {
+        processResp();
+        if (process_parity == PROCESS_PARITY_VALUE) { process_parity = 0; }
+      }
+    } else {
+      Serial.println("modem ON");
+      modemOn();
+    }
   }
   if(sleeptime > 0) {
     sleeptime--;
   } else {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
-      /*mq2.heaterPwrHigh();
-      mq9.cycleHeat();*/
+      gprs.powerOff();
       while(1) {}
     }
   }
   blink();
-  delay(1000);
+  delay(900);
 }
 
 void blink() {
@@ -169,7 +182,7 @@ void requestHandler() {
   } else if (command == 2) {
     master_query_time = 0;
     if (commandValue > 0) {
-      sleeptime = commandValue * 60;
+      sleeptime = commandValue * 60 - 8;
       sleep_threshold = sleeptime - SLEEP_DELAY;
       Wire.write(1);
     } else {
@@ -180,4 +193,68 @@ void requestHandler() {
   }
   command = 0;
   commandValue = 0;
+}
+
+void modemOn() {
+  gprs.powerOn();
+  wdt_reset();
+  while (!gprs.init()) {
+    Serial.println("GPRS not init");
+    delay(1000);
+    wdt_reset();
+  }
+  Serial.println("GPRS init!");
+  Serial1.println("ATE0");
+  delay(1000);
+  Serial1.println("AT+HTTPINIT");
+  delay(1000);
+  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:1234/watch?action=get&iddev=infDev0\"");
+  delay(1000);
+  wdt_reset();
+  Serial1.println("AT+SAPBR=1,1");
+  delay(3000);
+  Serial1.println("AT+HTTPACTION=0");
+  delay(3000);
+  wdt_reset();
+}
+
+String getResp() {
+  String input = String("                                                                ");
+  byte strpos = 0;
+  while (Serial1.available() > 0) {
+    input[strpos] = Serial1.read();
+    strpos++;
+  }
+  return input;
+}
+
+void processResp() {
+  String tmpResp = getResp();
+  if (tmpResp.indexOf(String("+HTTPACTION:")) >= 0) {
+    if (tmpResp.indexOf(String(",200,")) >= 0) {
+      Serial1.println("AT+HTTPREAD");
+    } else {
+      conn_error++;
+      Serial1.println("AT+HTTPACTION=0");
+    }
+  } else if (tmpResp.indexOf(String("+HTTPREAD:")) >= 0) {
+    byte indFrom = tmpResp.indexOf(":1") + 4;
+    char act = tmpResp.substring(indFrom, indFrom + 1)[0];
+    switch(act) {
+      case '0': Serial.println("NOTHING"); break;
+      case '1': Serial.println("ON"); break;
+      case '2': Serial.println("REBOOT"); break;
+      default: conn_error++;
+    }
+    Serial1.println("AT+HTTPACTION=0");
+  } else {
+    conn_error++;
+    wdt_reset();
+    Serial.println("repeat");
+    Serial1.println("AT+SAPBR=1,1");
+    delay(3000);
+    Serial1.println("AT+HTTPACTION=0");
+    delay(3000);
+  }
+  Serial.println(conn_error);
 }

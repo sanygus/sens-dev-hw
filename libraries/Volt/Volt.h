@@ -1,6 +1,6 @@
 #ifndef Volt_h
 #define Volt_h
-#define count 10
+#define countValues 10
 
 #include "Arduino.h"
 
@@ -12,7 +12,7 @@ class Volt
     unsigned int getVolt();
   private:
     byte _pin;
-    unsigned int _values[count];
+    unsigned int _values[countValues];
     unsigned int _value;
 };
 

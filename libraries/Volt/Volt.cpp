@@ -10,13 +10,13 @@ void Volt::readVolt()
 {
   unsigned int sum = 0;
   int countNotNull = 0;
-  for (int i = 1; i < count; i++) {
+  for (int i = 1; i < countValues; i++) {
     _values[i - 1] = _values[i];
     if (_values[i] > 0) {
       sum += _values[i];
       countNotNull++;
     }
-    if (i == (count - 1)) {
+    if (i == (countValues - 1)) {
       _values[i] = analogRead(_pin);
       if (_values[i] > 0) {
         sum += _values[i];
