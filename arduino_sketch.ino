@@ -237,6 +237,7 @@ void processResp() {
       conn_error++;
       Serial1.println("AT+HTTPACTION=0");
     }
+    Serial.println("process 1");
   } else if (tmpResp.indexOf(String("+HTTPREAD:")) >= 0) {
     byte indFrom = tmpResp.indexOf(":1") + 4;
     char act = tmpResp.substring(indFrom, indFrom + 1)[0];
@@ -247,14 +248,20 @@ void processResp() {
       default: conn_error++;
     }
     Serial1.println("AT+HTTPACTION=0");
+    Serial.println("process 2");
   } else {
     conn_error++;
-    wdt_reset();
-    Serial.println("repeat");
-    Serial1.println("AT+SAPBR=1,1");
-    delay(3000);
-    Serial1.println("AT+HTTPACTION=0");
-    delay(3000);
+    if (conn_error > 5) {
+      wdt_reset();
+      Serial.println("repeat");
+      Serial1.println("AT+SAPBR=1,1");
+      delay(3000);
+      Serial1.println("AT+HTTPACTION=0");
+      delay(3000);
+      wdt_reset();
+      conn_error = 0;
+    }
+    Serial.println("process ELSE");
   }
   Serial.println(conn_error);
 }
