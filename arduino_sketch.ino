@@ -28,11 +28,13 @@ unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Me
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
-unsigned long sleeptime = 120;
-unsigned long sleep_threshold = 115;
+unsigned long sleeptime = 0;
+unsigned long sleep_threshold = 0;
 unsigned long master_query_time = 0;
 unsigned int conn_error = 0;
 byte process_parity = 0;
+unsigned long startloopmillis = 0;
+unsigned long endloopmillis = 0;
 
 GPRS gprs(Serial1, 4, 5);
 
@@ -44,12 +46,9 @@ void setup()
   Wire.onRequest(requestHandler);
   pinMode(13, OUTPUT);
   gprs.powerOff();
-  digitalWrite(13, 1); delay(1000);
-  digitalWrite(13, 0); delay(1000);
-  digitalWrite(13, 1); delay(1000);
-  digitalWrite(13, 0); delay(1000);
-  digitalWrite(13, 1); delay(1000);
-  digitalWrite(13, 0); delay(1000);
+  digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
+  digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
+  digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
   wdt_enable(WDTO_8S);
 
   Serial.begin(115200);
@@ -63,49 +62,15 @@ void setup()
 }
 
 void loop() {
+  startloopmillis = millis();
   wdt_reset();
   if (sleeptime >= sleep_threshold) {
-    if (!relay.status()) {
-      relay.on();
-    }
-    if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) {
-      while(1) {}
-    }
-    if (sleeptime == 0) {
-      master_query_time++;
-    }
-    // MQ-2
-    if (mq2.heatingCompleted()) {
-      if (!mq2.isCalibrated()) {
-        mq2.calibrate();
-      } else {
-        MQ2[0] = mq2.readLPG();
-        MQ2[1] = mq2.readMethane();
-        MQ2[2] = mq2.readSmoke();
-        MQ2[3] = mq2.readHydrogen();
-        mq2_val_ready = true;
-      }
-    }
-    // MQ-9
-    if (mq9.atHeatCycleEnd()) {
-      if (!mq9.isCalibrated()) {
-        mq9.calibrate();
-      } else {
-        MQ9[0] = mq9.readLPG();
-        MQ9[1] = mq9.readMethane();
-        MQ9[2] = mq9.readCarbonMonoxide();
-        mq9_val_ready = true;
-      }
-      mq9.cycleHeat();
-    }
-    // mic
-    mic.readNoise();
-    // volt
-    volt.readVolt();
+    if (!relay.status()) { relay.on(); }
+    if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
+    if (sleeptime == 0) { master_query_time++; }
+    readSensors();
   } else { // sleeptime < sleep_threshold
-    if (relay.status()) {
-      relay.off(); 
-    }
+    if (relay.status()) { relay.off(); }
     mq2.heaterPwrOff();
     mq9.heaterPwrOff();
     if (digitalRead(5)) {
@@ -119,17 +84,16 @@ void loop() {
       modemOn();
     }
   }
-  if(sleeptime > 0) {
-    sleeptime--;
-  } else {
+  if(sleeptime > 0) { sleeptime--; } else {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
       gprs.powerOff();
-      while(1) {}
+      master_query_time = 0;
     }
   }
   blink();
-  delay(900);
+  endloopmillis = millis();
+  if (endloopmillis > startloopmillis) { delay(1000 - endloopmillis + startloopmillis); } else { delay(900); }
 }
 
 void blink() {
@@ -142,6 +106,37 @@ void blink() {
     delay(100);
     digitalWrite(13, 1);
   }
+}
+
+void readSensors() {
+  // MQ-2
+  if (mq2.heatingCompleted()) {
+    if (!mq2.isCalibrated()) {
+      mq2.calibrate();
+    } else {
+      MQ2[0] = mq2.readLPG();
+      MQ2[1] = mq2.readMethane();
+      MQ2[2] = mq2.readSmoke();
+      MQ2[3] = mq2.readHydrogen();
+      mq2_val_ready = true;
+    }
+  }
+  // MQ-9
+  if (mq9.atHeatCycleEnd()) {
+    if (!mq9.isCalibrated()) {
+      mq9.calibrate();
+    } else {
+      MQ9[0] = mq9.readLPG();
+      MQ9[1] = mq9.readMethane();
+      MQ9[2] = mq9.readCarbonMonoxide();
+      mq9_val_ready = true;
+    }
+    mq9.cycleHeat();
+  }
+  // mic
+  mic.readNoise();
+  // volt
+  volt.readVolt();
 }
 
 void receiveHandler(int bc) {
@@ -243,8 +238,8 @@ void processResp() {
     char act = tmpResp.substring(indFrom, indFrom + 1)[0];
     switch(act) {
       case '0': Serial.println("NOTHING"); break;
-      case '1': Serial.println("ON"); break;
-      case '2': Serial.println("REBOOT"); break;
+      case '1': sleeptime = 0; break;
+      case '2': while(1) {}; break;
       default: conn_error++;
     }
     Serial1.println("AT+HTTPACTION=0");
