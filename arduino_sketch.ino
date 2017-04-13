@@ -34,7 +34,7 @@ unsigned long master_query_time = 0;
 unsigned int conn_error = 0;
 byte process_parity = 0;
 unsigned long startloopmillis = 0;
-unsigned long endloopmillis = 0;
+unsigned long delayms = 0;
 
 GPRS gprs(Serial1, 4, 5);
 
@@ -79,10 +79,7 @@ void loop() {
         processResp();
         if (process_parity == PROCESS_PARITY_VALUE) { process_parity = 0; }
       }
-    } else {
-      Serial.println("modem ON");
-      modemOn();
-    }
+    } else { modemOn(); }
   }
   if(sleeptime > 0) { sleeptime--; } else {
     if (sleep_threshold > 0) {
@@ -92,8 +89,8 @@ void loop() {
     }
   }
   blink();
-  endloopmillis = millis();
-  if (endloopmillis > startloopmillis) { delay(1000 - endloopmillis + startloopmillis); } else { delay(900); }
+  delayms = 1000 - (millis() - startloopmillis);
+  if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(900); }
 }
 
 void blink() {
@@ -194,7 +191,6 @@ void modemOn() {
   gprs.powerOn();
   wdt_reset();
   while (!gprs.init()) {
-    Serial.println("GPRS not init");
     delay(1000);
     wdt_reset();
   }
@@ -258,5 +254,4 @@ void processResp() {
     }
     Serial.println("process ELSE");
   }
-  Serial.println(conn_error);
 }
