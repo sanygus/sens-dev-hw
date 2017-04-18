@@ -32,6 +32,7 @@ unsigned long sleeptime = 0;
 unsigned long sleep_threshold = 0;
 unsigned long master_query_time = 0;
 unsigned int conn_error = 0;
+byte modem_err = 0;
 byte process_parity = 0;
 unsigned long startloopmillis = 0;
 unsigned long delayms = 0;
@@ -85,6 +86,8 @@ void loop() {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
       gprs.powerOff();
+      mq2.heaterPwrHigh();
+      mq9.cycleHeat();
       master_query_time = 0;
     }
   }
@@ -251,6 +254,12 @@ void processResp() {
       delay(3000);
       wdt_reset();
       conn_error = 0;
+      modem_err++;
+    }
+    if (modem_err > 3) {
+      gprs.powerOff();
+      wdt_reset();
+      modemOn();
     }
     Serial.println("process ELSE");
   }
