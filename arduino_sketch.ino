@@ -31,7 +31,7 @@ boolean mq9_val_ready = false;
 unsigned long sleeptime = 0;
 unsigned long sleep_threshold = 0;
 unsigned long master_query_time = 0;
-unsigned int conn_error = 0;
+byte conn_error = 0;
 byte modem_err = 0;
 byte process_parity = 0;
 unsigned long startloopmillis = 0;
@@ -183,6 +183,13 @@ void requestHandler() {
     } else {
       Wire.write(2);
     }
+  } else if (command == 3) {//modem params
+    //commandValue
+  } else if (command == 4) {//request statistic
+    byte data[] = { 1, conn_error, modem_err };
+    conn_error = 0;
+    modem_err = 0;
+    Wire.write(data, sizeof(data));
   } else {
     Wire.write(2);
   }
@@ -260,6 +267,7 @@ void processResp() {
       gprs.powerOff();
       wdt_reset();
       modemOn();
+      modem_err = 0;
     }
     Serial.println("process ELSE");
   }
