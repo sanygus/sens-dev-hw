@@ -28,11 +28,12 @@ unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Me
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
-unsigned long sleeptime = 0;
-unsigned long sleep_threshold = 0;
+unsigned long sleeptime = 120;
+unsigned long sleep_threshold = 115;
 unsigned long master_query_time = 0;
 byte conn_error = 0;
 byte modem_err = 0;
+byte wakeup_reason = 0;//0-run, 1-end sleep, 2-external(HTTP), 3-external(RING)
 byte process_parity = 0;
 unsigned long startloopmillis = 0;
 unsigned long delayms = 0;
@@ -64,12 +65,14 @@ void setup()
 
 void loop() {
   startloopmillis = millis();
+  //Serial.println(startloopmillis);
   wdt_reset();
   if (sleeptime >= sleep_threshold) {
     if (!relay.status()) { relay.on(); }
     if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
     if (sleeptime == 0) { master_query_time++; }
     readSensors();
+    //Serial.println("bodr");
   } else { // sleeptime < sleep_threshold
     if (relay.status()) { relay.off(); }
     mq2.heaterPwrOff();
@@ -80,9 +83,12 @@ void loop() {
         processResp();
         if (process_parity == PROCESS_PARITY_VALUE) { process_parity = 0; }
       }
-    } else { modemOn(); }
+    } else { /*Serial.println("Modem ON");*/ modemOn(); }
   }
-  if(sleeptime > 0) { sleeptime--; } else {
+  if (sleeptime > 0) {
+    if (sleeptime == 1) { wakeup_reason = 1; }
+    sleeptime--;
+  } else {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
       gprs.powerOff();
@@ -172,7 +178,7 @@ void requestHandler() {
       volt_val >> 8, volt_val & 0xFF,
     };
     mq2_val_ready = false;
-    mq9_val_ready = false;
+    mq9_val_ready = false;    
     Wire.write(data, sizeof(data));
   } else if (command == 2) {
     master_query_time = 0;
@@ -186,7 +192,8 @@ void requestHandler() {
   } else if (command == 3) {//modem params
     //commandValue
   } else if (command == 4) {//request statistic
-    byte data[] = { 1, conn_error, modem_err };
+    byte data[] = { 1, wakeup_reason, conn_error, modem_err };
+    wakeup_reason = 0;
     conn_error = 0;
     modem_err = 0;
     Wire.write(data, sizeof(data));
@@ -200,9 +207,17 @@ void requestHandler() {
 void modemOn() {
   gprs.powerOn();
   wdt_reset();
+  byte gprsinit_wait = 0;
   while (!gprs.init()) {
     delay(1000);
+    gprsinit_wait++;
     wdt_reset();
+    if (gprsinit_wait > 10) {
+      gprs.powerOff();
+      gprs.powerOn();
+      wdt_reset();
+      gprsinit_wait = 0;
+    }
   }
   Serial.println("GPRS init!");
   Serial1.println("ATE0");
@@ -236,6 +251,7 @@ void processResp() {
       Serial1.println("AT+HTTPREAD");
     } else {
       conn_error++;
+      Serial.println("action NO 200");
       Serial1.println("AT+HTTPACTION=0");
     }
     Serial.println("process 1");
@@ -243,32 +259,31 @@ void processResp() {
     byte indFrom = tmpResp.indexOf(":1") + 4;
     char act = tmpResp.substring(indFrom, indFrom + 1)[0];
     switch(act) {
-      case '0': Serial.println("NOTHING"); break;
-      case '1': sleeptime = 0; break;
+      case '0': Serial.println("NOTHING"); conn_error = 0; break;
+      case '1': sleeptime = 0; conn_error = 0; wakeup_reason = 2; break;
       case '2': while(1) {}; break;
       default: conn_error++;
     }
     Serial1.println("AT+HTTPACTION=0");
-    Serial.println("process 2");
+    //Serial.println("process 2");
+  } else if ((tmpResp.indexOf(String("RING")) >= 0) || (tmpResp.indexOf(String("+CLIP:")) >= 0)) {
+    sleeptime = 0;
+    wakeup_reason = 3;
+    Serial1.println("ATA");
+    delay(1000);
+    Serial1.println("ATH0");
   } else {
     conn_error++;
-    if (conn_error > 5) {
-      wdt_reset();
-      Serial.println("repeat");
-      Serial1.println("AT+SAPBR=1,1");
-      delay(3000);
-      Serial1.println("AT+HTTPACTION=0");
-      delay(3000);
-      wdt_reset();
-      conn_error = 0;
-      modem_err++;
-    }
-    if (modem_err > 3) {
-      gprs.powerOff();
-      wdt_reset();
-      modemOn();
-      modem_err = 0;
-    }
     Serial.println("process ELSE");
   }
+  if (conn_error > 5) {
+    Serial.println("modem reboot");
+    wdt_reset();
+    gprs.powerOff();
+    wdt_reset();
+    modemOn();
+    conn_error = 0;
+    modem_err++;
+  }
+  //Serial.println(tmpResp);
 }
