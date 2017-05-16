@@ -223,7 +223,7 @@ void modemOn() {
   delay(1000);
   Serial1.println("AT+HTTPINIT");
   delay(1000);
-  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:1234/watch?action=get&iddev=infDev4\"");
+  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:1234/watch?action=get&iddev=infDev3\"");
   delay(1000);
   wdt_reset();
   Serial1.println("AT+SAPBR=1,1");
