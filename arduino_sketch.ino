@@ -28,8 +28,8 @@ unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Me
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
 boolean mq2_val_ready = false;
 boolean mq9_val_ready = false;
-unsigned long sleeptime = 120;
-unsigned long sleep_threshold = 115;
+unsigned long sleeptime = 0;
+unsigned long sleep_threshold = 0;
 unsigned long master_query_time = 0;
 byte conn_error = 0;
 byte modem_err = 0;
@@ -65,7 +65,6 @@ void setup()
 
 void loop() {
   startloopmillis = millis();
-  //Serial.println(startloopmillis);
   wdt_reset();
   if (sleeptime >= sleep_threshold) {
     if (!relay.status()) { relay.on(); }
@@ -178,7 +177,7 @@ void requestHandler() {
       volt_val >> 8, volt_val & 0xFF,
     };
     mq2_val_ready = false;
-    mq9_val_ready = false;    
+    mq9_val_ready = false;
     Wire.write(data, sizeof(data));
   } else if (command == 2) {
     master_query_time = 0;
@@ -254,7 +253,7 @@ void processResp() {
       Serial.println("action NO 200");
       Serial1.println("AT+HTTPACTION=0");
     }
-    Serial.println("process 1");
+    //Serial.println("process 1");
   } else if (tmpResp.indexOf(String("+HTTPREAD:")) >= 0) {
     byte indFrom = tmpResp.indexOf(":1") + 4;
     char act = tmpResp.substring(indFrom, indFrom + 1)[0];
