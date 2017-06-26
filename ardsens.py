@@ -55,7 +55,7 @@ try:
   count = (Pressure_MSB << 16) | ( Pressure_LSB << 8 ) | Pressure_XLB
   res['press'] = round(((count/4096.0)*0.75006), 1)
   # power down
-  bus.write_byte_data(0x5c, 0x20, 0b00000100)
+  #bus.write_byte_data(0x5c, 0x20, 0b00000100)
   # soft reboot
   #bus.write_byte_data(0x5c,0x21, 0b10000100)
 except IOError:
