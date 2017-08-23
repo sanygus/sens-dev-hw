@@ -35,3 +35,12 @@ unsigned int Volt::getVolt()
 {
   return _value;
 }
+
+float Volt::getCharge(unsigned int min, unsigned int max)
+{
+  float charge = 0;
+  if (_value >= min) && (_value <= max) {
+    charge = (_value - min) / (max - min);
+  }
+  return charge;
+}

@@ -1,9 +1,10 @@
 #include <avr/wdt.h>
+#include <EEPROM.h>
+#include <Wire.h>
 #include <TroykaMQ.h>
 #include <Mic.h>
 #include <Volt.h>
 #include <Relay.h>
-#include <Wire.h>
 #include <GPRS_Shield_Arduino.h>
 #define PIN_MQ2         A0
 #define PIN_MQ2_HEATER  11
@@ -96,9 +97,10 @@ void loop() {
       master_query_time = 0;
     }
   }
+  volt.readVolt();
   blink();
   delayms = 1000 - (millis() - startloopmillis);
-  if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(900); }
+  if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(1); }
 }
 
 void blink() {
@@ -140,13 +142,11 @@ void readSensors() {
   }
   // mic
   mic.readNoise();
-  // volt
-  volt.readVolt();
 }
 
 void receiveHandler(int bc) {
   if (Wire.available() == 3) {
-    command = Wire.read();//1b//1-getValues,2-doSleep
+    command = Wire.read();//1b//1-getValues,2-doSleep,
     commandValue = Wire.read();//2b
     commandValue = commandValue << 8;
     commandValue = commandValue | Wire.read();
@@ -165,16 +165,16 @@ void requestHandler() {
     byte data[] = {
       1,
       mq2_val_ready,
-      MQ2[0] >> 8, MQ2[0] & 0xFF,
-      MQ2[1] >> 8, MQ2[1] & 0xFF,
-      MQ2[2] >> 8, MQ2[2] & 0xFF,
-      MQ2[3] >> 8, MQ2[3] & 0xFF,
+      (MQ2[0] >> 8) & 0xFF, MQ2[0] & 0xFF,
+      (MQ2[1] >> 8) & 0xFF, MQ2[1] & 0xFF,
+      (MQ2[2] >> 8) & 0xFF, MQ2[2] & 0xFF,
+      (MQ2[3] >> 8) & 0xFF, MQ2[3] & 0xFF,
       mq9_val_ready,
-      MQ9[0] >> 8, MQ9[0] & 0xFF,
-      MQ9[1] >> 8, MQ9[1] & 0xFF,
-      MQ9[2] >> 8, MQ9[2] & 0xFF,
-      mic_val >> 8, mic_val & 0xFF,
-      volt_val >> 8, volt_val & 0xFF,
+      (MQ9[0] >> 8) & 0xFF, MQ9[0] & 0xFF,
+      (MQ9[1] >> 8) & 0xFF, MQ9[1] & 0xFF,
+      (MQ9[2] >> 8) & 0xFF, MQ9[2] & 0xFF,
+      (mic_val >> 8) & 0xFF, mic_val & 0xFF,
+      (volt_val >> 8) & 0xFF, volt_val & 0xFF,
     };
     mq2_val_ready = false;
     mq9_val_ready = false;
@@ -190,12 +190,29 @@ void requestHandler() {
     }
   } else if (command == 3) {//modem params
     //commandValue
+
   } else if (command == 4) {//request statistic
     byte data[] = { 1, wakeup_reason, conn_error, modem_err };
     wakeup_reason = 0;
     conn_error = 0;
     modem_err = 0;
     Wire.write(data, sizeof(data));
+  } else if (command == 5) {//write mincharge
+    EEPROM.write(0, (commandValue >> 8) & 0xFF);
+    EEPROM.write(1, commandValue & 0xFF);
+    Wire.write(1);
+  } else if (command == 6) {//write maxcharge
+    EEPROM.write(2, (commandValue >> 8) & 0xFF);
+    EEPROM.write(3, commandValue & 0xFF);
+    Wire.write(1);
+  } else if (command == 7) {//write devid
+    EEPROM.write(4, (commandValue >> 8) & 0xFF);
+    EEPROM.write(5, commandValue & 0xFF);
+    Wire.write(1);
+  } else if (command == 8) {//write port
+    EEPROM.write(6, (commandValue >> 8) & 0xFF);
+    EEPROM.write(7, commandValue & 0xFF);
+    Wire.write(1);
   } else {
     Wire.write(2);
   }
@@ -223,7 +240,10 @@ void modemOn() {
   delay(1000);
   Serial1.println("AT+HTTPINIT");
   delay(1000);
-  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:1234/watch?action=get&iddev=infDev3\"");
+  unsigned int httpport = getParam(6, 7);
+  unsigned int devid = getParam(4, 5);
+  float charge = volt.getCharge();
+  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/watch?action=get&iddev=" + String(devid) + "&charge=" + String(charge, 3));
   delay(1000);
   wdt_reset();
   Serial1.println("AT+SAPBR=1,1");
@@ -231,6 +251,13 @@ void modemOn() {
   Serial1.println("AT+HTTPACTION=0");
   delay(3000);
   wdt_reset();
+}
+
+unsigned int getParam(unsigned int addrH, unsigned int addrL) {
+  unsigned int param = EEPROM.read(addrH);
+  param = param << 8;
+  param = param | EEPROM.read(addrL);
+  return param;
 }
 
 String getResp() {
@@ -253,7 +280,7 @@ void processResp() {
       Serial.println("action NO 200");
       Serial1.println("AT+HTTPACTION=0");
     }
-    //Serial.println("process 1");
+    Serial.println("process 1");
   } else if (tmpResp.indexOf(String("+HTTPREAD:")) >= 0) {
     byte indFrom = tmpResp.indexOf(":1") + 4;
     char act = tmpResp.substring(indFrom, indFrom + 1)[0];
@@ -264,7 +291,7 @@ void processResp() {
       default: conn_error++;
     }
     Serial1.println("AT+HTTPACTION=0");
-    //Serial.println("process 2");
+    Serial.println("process 2");
   } else if ((tmpResp.indexOf(String("RING")) >= 0) || (tmpResp.indexOf(String("+CLIP:")) >= 0)) {
     sleeptime = 0;
     wakeup_reason = 3;
@@ -273,16 +300,24 @@ void processResp() {
     Serial1.println("ATH0");
   } else {
     conn_error++;
+    if (conn_error > 5) {
+      wdt_reset();
+      Serial.println("repeat");
+      Serial1.println("AT+SAPBR=1,1");
+      delay(3000);
+      Serial1.println("AT+HTTPACTION=0");
+      delay(3000);
+      wdt_reset();
+      conn_error = 0;
+      modem_err++;
+    }
+    if (modem_err > 3) {
+      gprs.powerOff();
+      wdt_reset();
+      modemOn();
+      modem_err = 0;
+    }
     Serial.println("process ELSE");
-  }
-  if (conn_error > 5) {
-    Serial.println("modem reboot");
-    wdt_reset();
-    gprs.powerOff();
-    wdt_reset();
-    modemOn();
-    conn_error = 0;
-    modem_err++;
   }
   //Serial.println(tmpResp);
 }

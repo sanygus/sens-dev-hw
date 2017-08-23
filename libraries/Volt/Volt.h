@@ -10,6 +10,7 @@ class Volt
     Volt(int pin);
     void readVolt();
     unsigned int getVolt();
+    float getCharge(unsigned int min, unsigned int max);
   private:
     byte _pin;
     unsigned int _values[countValues];
