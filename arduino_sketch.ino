@@ -239,17 +239,22 @@ void modemOn() {
   Serial1.println("ATE0");
   delay(1000);
   Serial1.println("AT+HTTPINIT");
-  delay(1000);
-  unsigned int httpport = getParam(6, 7);
-  unsigned int devid = getParam(4, 5);
-  float charge = volt.getCharge();
-  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/watch?action=get&iddev=" + String(devid) + "&charge=" + String(charge, 3));
-  delay(1000);
+  delay(3000);
   wdt_reset();
   Serial1.println("AT+SAPBR=1,1");
   delay(3000);
+  wdt_reset();
+  sendHTTPReq();
+}
+
+void sendHTTPReq() {
+  float charge = volt.getCharge(getParam(0, 1), getParam(2, 3));
+  unsigned int devid = getParam(4, 5);
+  unsigned int httpport = getParam(6, 7);
+  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/watch?action=get&iddev=" + String(devid) + "&charge=" + String(charge, 3));
+  delay(1000);
   Serial1.println("AT+HTTPACTION=0");
-  delay(3000);
+  delay(1000);
   wdt_reset();
 }
 
@@ -278,7 +283,7 @@ void processResp() {
     } else {
       conn_error++;
       Serial.println("action NO 200");
-      Serial1.println("AT+HTTPACTION=0");
+      sendHTTPReq();
     }
     Serial.println("process 1");
   } else if (tmpResp.indexOf(String("+HTTPREAD:")) >= 0) {
@@ -290,7 +295,7 @@ void processResp() {
       case '2': while(1) {}; break;
       default: conn_error++;
     }
-    Serial1.println("AT+HTTPACTION=0");
+    sendHTTPReq();
     Serial.println("process 2");
   } else if ((tmpResp.indexOf(String("RING")) >= 0) || (tmpResp.indexOf(String("+CLIP:")) >= 0)) {
     sleeptime = 0;
