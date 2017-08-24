@@ -23,7 +23,7 @@ try:
       ]
     res['mic'] = data[17] << 8 | data[18]
     #convert to real vot values
-    res['volt'] = data[19] << 8 | data[20]
+    res['charge'] = round((data[19] << 8 | data[20]) / 1000, 3)
   else:
     res['error1'] = 'unknown answer'
 except IOError:

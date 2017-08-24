@@ -72,7 +72,7 @@ void loop() {
     if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
     if (sleeptime == 0) { master_query_time++; }
     readSensors();
-    //Serial.println("bodr");
+    Serial.println("working");
   } else { // sleeptime < sleep_threshold
     if (relay.status()) { relay.off(); }
     mq2.heaterPwrOff();
@@ -83,7 +83,7 @@ void loop() {
         processResp();
         if (process_parity == PROCESS_PARITY_VALUE) { process_parity = 0; }
       }
-    } else { /*Serial.println("Modem ON");*/ modemOn(); }
+    } else { modemOn(); Serial.println("Modem ON"); }
   }
   if (sleeptime > 0) {
     if (sleeptime == 1) { wakeup_reason = 1; }
@@ -144,6 +144,13 @@ void readSensors() {
   mic.readNoise();
 }
 
+unsigned int getParam(unsigned int addrH, unsigned int addrL) {
+  unsigned int param = EEPROM.read(addrH);
+  param = param << 8;
+  param = param | EEPROM.read(addrL);
+  return param;
+}
+
 void receiveHandler(int bc) {
   if (Wire.available() == 3) {
     command = Wire.read();//1b//1-getValues,2-doSleep,
@@ -161,7 +168,7 @@ void requestHandler() {
   if (command == 1) {
     master_query_time = 0;
     unsigned int mic_val = mic.getNoise();
-    unsigned int volt_val = volt.getVolt();
+    unsigned int charge = round(volt.getCharge(getParam(0, 1), getParam(2, 3)) * 1000);
     byte data[] = {
       1,
       mq2_val_ready,
@@ -174,7 +181,7 @@ void requestHandler() {
       (MQ9[1] >> 8) & 0xFF, MQ9[1] & 0xFF,
       (MQ9[2] >> 8) & 0xFF, MQ9[2] & 0xFF,
       (mic_val >> 8) & 0xFF, mic_val & 0xFF,
-      (volt_val >> 8) & 0xFF, volt_val & 0xFF,
+      (charge >> 8) & 0xFF, charge & 0xFF,
     };
     mq2_val_ready = false;
     mq9_val_ready = false;
@@ -213,6 +220,17 @@ void requestHandler() {
     EEPROM.write(6, (commandValue >> 8) & 0xFF);
     EEPROM.write(7, commandValue & 0xFF);
     Wire.write(1);
+  } else if (command == 9) {//write nowakethres
+    EEPROM.write(8, (commandValue >> 8) & 0xFF);
+    EEPROM.write(9, commandValue & 0xFF);
+    Wire.write(1);
+  } else if (command == 10) {//get params
+    int addrcnt = 10;
+    byte data[addrcnt];
+    for (int i = 0; i < addrcnt; i++) {
+      data[i] = EEPROM.read(i);
+    }
+    Wire.write(data, sizeof(data));
   } else {
     Wire.write(2);
   }
@@ -258,13 +276,6 @@ void sendHTTPReq() {
   wdt_reset();
 }
 
-unsigned int getParam(unsigned int addrH, unsigned int addrL) {
-  unsigned int param = EEPROM.read(addrH);
-  param = param << 8;
-  param = param | EEPROM.read(addrL);
-  return param;
-}
-
 String getResp() {
   String input = String("                                                                ");
   byte strpos = 0;
@@ -289,14 +300,26 @@ void processResp() {
   } else if (tmpResp.indexOf(String("+HTTPREAD:")) >= 0) {
     byte indFrom = tmpResp.indexOf(":1") + 4;
     char act = tmpResp.substring(indFrom, indFrom + 1)[0];
-    switch(act) {
-      case '0': Serial.println("NOTHING"); conn_error = 0; break;
-      case '1': sleeptime = 0; conn_error = 0; wakeup_reason = 2; break;
-      case '2': while(1) {}; break;
-      default: conn_error++;
+    if (act == '0') {
+      conn_error = 0;
+      Serial.println("NOTHING");
+    } else if (act == '1') {
+      float charge = volt.getCharge(getParam(0, 1), getParam(2, 3));//0-1
+      float wakethres = ((float)getParam(8, 9) / (float)1000);//1000 = 1
+      if (charge > wakethres) {
+        sleeptime = 0;
+        conn_error = 0;
+        wakeup_reason = 2;
+      } else {
+        // low charge msg
+      }
+    } else if (act == '2') {
+      while(1) {};
+    } else {
+      conn_error++;
     }
-    sendHTTPReq();
     Serial.println("process 2");
+    sendHTTPReq();
   } else if ((tmpResp.indexOf(String("RING")) >= 0) || (tmpResp.indexOf(String("+CLIP:")) >= 0)) {
     sleeptime = 0;
     wakeup_reason = 3;
