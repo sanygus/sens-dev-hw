@@ -70,7 +70,7 @@ void loop() {
   if (sleeptime >= sleep_threshold) {
     if (!relay.status()) { relay.on(); }
     if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
-    if (sleeptime == 0) { master_query_time++; }
+    //if (sleeptime == 0) { master_query_time++; }/testing
     readSensors();
     Serial.println("working");
   } else { // sleeptime < sleep_threshold
@@ -86,11 +86,11 @@ void loop() {
     } else { modemOn(); Serial.println("Modem ON"); }
   }
   if (sleeptime > 0) {
-    if (sleeptime == 1) { wakeup_reason = 1; }
     sleeptime--;
   } else {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
+      wakeup_reason = 1;
       gprs.powerOff();
       mq2.heaterPwrHigh();
       mq9.cycleHeat();
@@ -98,6 +98,8 @@ void loop() {
     }
   }
   volt.readVolt();
+  Serial.println("analog: " + String(analogRead(A3)));
+  Serial.println("charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
   blink();
   delayms = 1000 - (millis() - startloopmillis);
   if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(1); }
