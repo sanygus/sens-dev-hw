@@ -83,7 +83,10 @@ void loop() {
         processResp();
         if (process_parity == PROCESS_PARITY_VALUE) { process_parity = 0; }
       }
-    } else { modemOn(); Serial.println("Modem ON"); }
+    } else {
+      modemOn();
+      Serial.println("Modem ON");
+    }
   }
   if (sleeptime > 0) {
     sleeptime--;
@@ -197,9 +200,9 @@ void requestHandler() {
     } else {
       Wire.write(2);
     }
-  } else if (command == 3) {//modem params
-    //commandValue
-
+  } else if (command == 3) {//heartbeat
+    master_query_time = 0;
+    Wire.write(1);
   } else if (command == 4) {//request statistic
     byte data[] = { 1, wakeup_reason, conn_error, modem_err };
     wakeup_reason = 0;
@@ -312,18 +315,16 @@ void processResp() {
         sleeptime = 0;
         conn_error = 0;
         wakeup_reason = 2;
-      } else {
-        // low charge msg
       }
     } else if (act == '2') {
       while(1) {};
     } else {
-      conn_error++;
-    }
+      conn_error++
+;    }
     Serial.println("process 2");
     sendHTTPReq();
   } else if ((tmpResp.indexOf(String("RING")) >= 0) || (tmpResp.indexOf(String("+CLIP:")) >= 0)) {
-    sleeptime = 0;
+    //sleeptime = 0;
     wakeup_reason = 3;
     Serial1.println("ATA");
     delay(1000);
