@@ -173,7 +173,6 @@ void requestHandler() {
   if (command == 1) {
     master_query_time = 0;
     unsigned int mic_val = mic.getNoise();
-    unsigned int charge = round(volt.getCharge(getParam(0, 1), getParam(2, 3)) * 1000);
     byte data[] = {
       1,
       mq2_val_ready,
@@ -186,7 +185,6 @@ void requestHandler() {
       (MQ9[1] >> 8) & 0xFF, MQ9[1] & 0xFF,
       (MQ9[2] >> 8) & 0xFF, MQ9[2] & 0xFF,
       (mic_val >> 8) & 0xFF, mic_val & 0xFF,
-      (charge >> 8) & 0xFF, charge & 0xFF,
     };
     mq2_val_ready = false;
     mq9_val_ready = false;
@@ -200,9 +198,11 @@ void requestHandler() {
     } else {
       Wire.write(2);
     }
-  } else if (command == 3) {//heartbeat
+  } else if (command == 3) {//get only charge
     master_query_time = 0;
-    Wire.write(1);
+    unsigned int charge = round(volt.getCharge(getParam(0, 1), getParam(2, 3)) * 1000);
+    byte data[] = { 1, (charge >> 8) & 0xFF, charge & 0xFF };
+    Wire.write(data, sizeof(data));
   } else if (command == 4) {//request statistic
     byte data[] = { 1, wakeup_reason, conn_error, modem_err };
     wakeup_reason = 0;
@@ -236,6 +236,9 @@ void requestHandler() {
       data[i] = EEPROM.read(i);
     }
     Wire.write(data, sizeof(data));
+  } else if (command == 11) {//heartbeat
+    master_query_time = 0;
+    Wire.write(1);
   } else {
     Wire.write(2);
   }
@@ -274,7 +277,7 @@ void sendHTTPReq() {
   float charge = volt.getCharge(getParam(0, 1), getParam(2, 3));
   unsigned int devid = getParam(4, 5);
   unsigned int httpport = getParam(6, 7);
-  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/watch?action=get&iddev=" + String(devid) + "&charge=" + String(charge, 3));
+  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/heartbeat/" + String(devid) + "/ard&charge=" + String(charge, 3));
   delay(1000);
   Serial1.println("AT+HTTPACTION=0");
   delay(1000);

@@ -3,7 +3,7 @@ bus = smbus.SMBus(1)
 
 while(True):
 	try:
-		bus.write_i2c_block_data(0x05, 3, [0, 0])
+		bus.write_i2c_block_data(0x05, 11, [0, 0])
 		data = bus.read_i2c_block_data(0x05, 0, 1)
 		if data[0] == 1:
 			print('ok')#testing

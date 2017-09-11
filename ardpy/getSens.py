@@ -4,7 +4,7 @@ res = {}
 
 try:
   bus.write_i2c_block_data(0x05, 3, [0, 0])
-  data = bus.read_i2c_block_data(0x05, 0, 21)
+  data = bus.read_i2c_block_data(0x05, 0, 19)
   
   if data[0]:
     if data[1]:
@@ -22,8 +22,6 @@ try:
         data[15] << 8 | data[16]
       ]
     res['mic'] = data[17] << 8 | data[18]
-    #convert to real vot values
-    res['charge'] = round((data[19] << 8 | data[20]) / 1000, 3)
   else:
     res['error1'] = 'unknown answer'
 except IOError:
