@@ -1,34 +1,35 @@
 #include <avr/wdt.h>
 #include <EEPROM.h>
 #include <Wire.h>
-#include <TroykaMQ.h>
-#include <Mic.h>
 #include <Volt.h>
 #include <Relay.h>
 #include <GPRS_Shield_Arduino.h>
+/*#include <TroykaMQ.h>
+#include <Mic.h>
 #define PIN_MQ2         A0
 #define PIN_MQ2_HEATER  11
 #define PIN_MQ9         A1
 #define PIN_MQ9_HEATER  10
-#define PIN_MIC         A2
+#define PIN_MIC         A2*/
 #define PIN_VOLT        A3
 #define PIN_RELAY       12
 #define SLEEP_DELAY     20
 #define MASTER_QUERY_TIME_THRESHOLD 120
 #define PROCESS_PARITY_VALUE 19
 
-MQ2 mq2(PIN_MQ2, PIN_MQ2_HEATER);
+/*MQ2 mq2(PIN_MQ2, PIN_MQ2_HEATER);
 MQ9 mq9(PIN_MQ9, PIN_MQ9_HEATER);
-Mic mic(PIN_MIC);
+Mic mic(PIN_MIC);*/
 Volt volt(PIN_VOLT);
 Relay relay(PIN_RELAY, 13);
+GPRS gprs(Serial1, 4, 5);
 
 byte command = 0;
 unsigned int commandValue = 0;
-unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Methane (метан), Smoke (дым), Hydrogen (водород) in ppm
+/*unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Methane (метан), Smoke (дым), Hydrogen (водород) in ppm
 unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
 boolean mq2_val_ready = false;
-boolean mq9_val_ready = false;
+boolean mq9_val_ready = false;*/
 unsigned long sleeptime = 0;
 unsigned long sleep_threshold = 0;
 unsigned long master_query_time = 0;
@@ -39,8 +40,6 @@ byte process_parity = 0;
 unsigned long startloopmillis = 0;
 unsigned long delayms = 0;
 
-GPRS gprs(Serial1, 4, 5);
-
 void setup()
 {
   wdt_disable();
@@ -48,6 +47,7 @@ void setup()
   Wire.onReceive(receiveHandler);
   Wire.onRequest(requestHandler);
   pinMode(13, OUTPUT);
+  pinMode(PIN_RELAY, OUTPUT);
   gprs.powerOff();
   digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
   digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
@@ -57,27 +57,27 @@ void setup()
   Serial.begin(115200);
   Serial1.begin(115200);
 
-  pinMode(PIN_MQ2_HEATER, OUTPUT);
+  /*pinMode(PIN_MQ2_HEATER, OUTPUT);
   pinMode(PIN_MQ9_HEATER, OUTPUT);
-  pinMode(PIN_RELAY, OUTPUT);
   mq2.heaterPwrHigh();
-  mq9.cycleHeat();
+  mq9.cycleHeat();*/
 }
 
 void loop() {
   startloopmillis = millis();
   wdt_reset();
-  debout("-------------------------");
+  //debout("-------------------------");
   if (sleeptime >= sleep_threshold) {
     if (!relay.status()) { relay.on(); debout("relay ON"); }
     if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
-    //if (sleeptime == 0) { master_query_time++; }/testing
-    readSensors();
+    if (sleeptime == 0) { master_query_time++; }
+    //readSensors();
     debout("working");
+    debout("master_query_time: " + String(master_query_time));
   } else { // sleeptime < sleep_threshold
     if (relay.status()) { relay.off(); debout("relay OFF"); }
-    mq2.heaterPwrOff();
-    mq9.heaterPwrOff();
+    /*mq2.heaterPwrOff();
+    mq9.heaterPwrOff();*/
     if (digitalRead(5)) {
       process_parity++;
       if (process_parity >= (PROCESS_PARITY_VALUE - 1)) {
@@ -91,18 +91,19 @@ void loop() {
   }
   if (sleeptime > 0) {
     sleeptime--;
-    if (sleeptime == 1) { wakeup_reason = 1; }
+    if (sleeptime == 0) { wakeup_reason = 1; }
   } else {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
       gprs.powerOff();
-      mq2.heaterPwrHigh();
-      mq9.cycleHeat();
+      debout("out of sleep");
+      /*mq2.heaterPwrHigh();
+      mq9.cycleHeat();*/
       master_query_time = 0;
     }
   }
   volt.readVolt();
-  debout("analog: " + String(analogRead(A3)) + "        charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
+  //debout("analog: " + String(analogRead(A3)) + "        charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
   blink();
   delayms = 1000 - (millis() - startloopmillis);
   if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(1); }
@@ -120,7 +121,7 @@ void blink() {
   }
 }
 
-void readSensors() {
+/*void readSensors() {
   // MQ-2
   if (mq2.heatingCompleted()) {
     if (!mq2.isCalibrated()) {
@@ -148,7 +149,7 @@ void readSensors() {
   // mic
   mic.readNoise();
   debout("readSensors");
-}
+}*/
 
 unsigned int getParam(unsigned int addrH, unsigned int addrL) {
   unsigned int param = EEPROM.read(addrH);
@@ -171,7 +172,7 @@ void receiveHandler(int bc) {
 }
 
 void requestHandler() {
-  if (command == 1) {
+  /*if (command == 1) {
     master_query_time = 0;
     unsigned int mic_val = mic.getNoise();
     byte data[] = {
@@ -190,7 +191,7 @@ void requestHandler() {
     mq2_val_ready = false;
     mq9_val_ready = false;
     Wire.write(data, sizeof(data));
-  } else if (command == 2) {
+  } else */if (command == 2) {
     master_query_time = 0;
     if (commandValue > 0) {
       sleeptime = commandValue * 60 - 8;
@@ -251,11 +252,14 @@ void modemOn() {
   gprs.powerOn();
   wdt_reset();
   byte gprsinit_wait = 0;
+  debout("try init GPRS");
   while (!gprs.init()) {
+    debout("IN init GPRS");
     delay(1000);
     gprsinit_wait++;
     wdt_reset();
     if (gprsinit_wait > 10) {
+      debout("gprsinit_wait REBOOT");
       gprs.powerOff();
       gprs.powerOn();
       wdt_reset();
@@ -341,7 +345,8 @@ void processResp() {
   if (conn_error > 5) {
     wdt_reset();
     debout("repeat");
-    //Serial1.println("AT+SAPBR=0,1");//close
+    Serial1.println("AT+SAPBR=0,1");//close
+    delay(500);
     Serial1.println("AT+SAPBR=1,1");
     delay(3000);
     Serial1.println("AT+HTTPACTION=0");

@@ -2,11 +2,11 @@ import smbus, time, json
 bus = smbus.SMBus(1)
 res = {}
 
+'''
 try:
   bus.write_i2c_block_data(0x05, 1, [0, 0])
   data = bus.read_i2c_block_data(0x05, 0, 19)
-  
-  if data[0]:
+  if data[0] == 1:
     if data[1]:
       res['gas1'] = [
         data[2] << 8 | data[3],
@@ -28,6 +28,7 @@ except IOError:
   res['error1'] = 'IOError'
 except:
   res['error1'] = 'unknown error in first block'
+'''
 
 try:
   # power up LPS331AP pressure sensor & set BDU bit
