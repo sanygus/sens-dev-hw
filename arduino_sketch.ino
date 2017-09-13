@@ -15,7 +15,7 @@
 #define PIN_RELAY       12
 #define SLEEP_DELAY     20
 #define MASTER_QUERY_TIME_THRESHOLD 120
-#define PROCESS_PARITY_VALUE 10
+#define PROCESS_PARITY_VALUE 19
 
 MQ2 mq2(PIN_MQ2, PIN_MQ2_HEATER);
 MQ9 mq9(PIN_MQ9, PIN_MQ9_HEATER);
@@ -67,14 +67,15 @@ void setup()
 void loop() {
   startloopmillis = millis();
   wdt_reset();
+  debout("-------------------------");
   if (sleeptime >= sleep_threshold) {
-    if (!relay.status()) { relay.on(); }
+    if (!relay.status()) { relay.on(); debout("relay ON"); }
     if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
     //if (sleeptime == 0) { master_query_time++; }/testing
     readSensors();
-    Serial.println("working");
+    debout("working");
   } else { // sleeptime < sleep_threshold
-    if (relay.status()) { relay.off(); }
+    if (relay.status()) { relay.off(); debout("relay OFF"); }
     mq2.heaterPwrOff();
     mq9.heaterPwrOff();
     if (digitalRead(5)) {
@@ -84,16 +85,16 @@ void loop() {
         if (process_parity == PROCESS_PARITY_VALUE) { process_parity = 0; }
       }
     } else {
+      debout("Modem ON");
       modemOn();
-      Serial.println("Modem ON");
     }
   }
   if (sleeptime > 0) {
     sleeptime--;
+    if (sleeptime == 1) { wakeup_reason = 1; }
   } else {
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
-      wakeup_reason = 1;
       gprs.powerOff();
       mq2.heaterPwrHigh();
       mq9.cycleHeat();
@@ -101,8 +102,7 @@ void loop() {
     }
   }
   volt.readVolt();
-  Serial.println("analog: " + String(analogRead(A3)));
-  Serial.println("charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
+  debout("analog: " + String(analogRead(A3)) + "        charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
   blink();
   delayms = 1000 - (millis() - startloopmillis);
   if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(1); }
@@ -147,6 +147,7 @@ void readSensors() {
   }
   // mic
   mic.readNoise();
+  debout("readSensors");
 }
 
 unsigned int getParam(unsigned int addrH, unsigned int addrL) {
@@ -261,7 +262,7 @@ void modemOn() {
       gprsinit_wait = 0;
     }
   }
-  Serial.println("GPRS init!");
+  debout("GPRS init!");
   Serial1.println("ATE0");
   delay(1000);
   Serial1.println("AT+HTTPINIT");
@@ -277,7 +278,7 @@ void sendHTTPReq() {
   float charge = volt.getCharge(getParam(0, 1), getParam(2, 3));
   unsigned int devid = getParam(4, 5);
   unsigned int httpport = getParam(6, 7);
-  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/heartbeat/" + String(devid) + "/ard&charge=" + String(charge, 3));
+  Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/heartbeat/" + String(devid) + "/ard?charge=" + String(charge, 3) + "\"");
   delay(1000);
   Serial1.println("AT+HTTPACTION=0");
   delay(1000);
@@ -301,57 +302,68 @@ void processResp() {
       Serial1.println("AT+HTTPREAD");
     } else {
       conn_error++;
-      Serial.println("action NO 200");
+      debout("action NO 200");
       sendHTTPReq();
     }
-    Serial.println("process 1");
+    debout("process 1");
   } else if (tmpResp.indexOf(String("+HTTPREAD:")) >= 0) {
     byte indFrom = tmpResp.indexOf(":1") + 4;
     char act = tmpResp.substring(indFrom, indFrom + 1)[0];
     if (act == '0') {
       conn_error = 0;
-      Serial.println("NOTHING");
+      debout("NOTHING");
     } else if (act == '1') {
+      conn_error = 0;
       float charge = volt.getCharge(getParam(0, 1), getParam(2, 3));//0-1
       float wakethres = ((float)getParam(8, 9) / (float)1000);//1000 = 1
       if (charge > wakethres) {
         sleeptime = 0;
-        conn_error = 0;
         wakeup_reason = 2;
       }
+      debout("current charge " + String(charge) + " ----- wakethres " + String(wakethres));
     } else if (act == '2') {
       while(1) {};
     } else {
-      conn_error++
-;    }
-    Serial.println("process 2");
+      conn_error++;
+    }
+    debout("process 2");
     sendHTTPReq();
   } else if ((tmpResp.indexOf(String("RING")) >= 0) || (tmpResp.indexOf(String("+CLIP:")) >= 0)) {
     //sleeptime = 0;
-    wakeup_reason = 3;
+    //wakeup_reason = 3;
     Serial1.println("ATA");
     delay(1000);
     Serial1.println("ATH0");
   } else {
     conn_error++;
-    if (conn_error > 5) {
-      wdt_reset();
-      Serial.println("repeat");
-      Serial1.println("AT+SAPBR=1,1");
-      delay(3000);
-      Serial1.println("AT+HTTPACTION=0");
-      delay(3000);
-      wdt_reset();
-      conn_error = 0;
-      modem_err++;
-    }
-    if (modem_err > 3) {
-      gprs.powerOff();
-      wdt_reset();
-      modemOn();
-      modem_err = 0;
-    }
-    Serial.println("process ELSE");
+    debout("process ELSE");
   }
-  //Serial.println(tmpResp);
+  if (conn_error > 5) {
+    wdt_reset();
+    debout("repeat");
+    //Serial1.println("AT+SAPBR=0,1");//close
+    Serial1.println("AT+SAPBR=1,1");
+    delay(3000);
+    Serial1.println("AT+HTTPACTION=0");
+    delay(3000);
+    wdt_reset();
+    conn_error = 0;
+    modem_err++;
+  }
+  if (modem_err > 3) {
+    debout("modem reboot");
+    gprs.powerOff();
+    wdt_reset();
+    modemOn();
+    modem_err = 0;
+  }
+  debout(tmpResp);
+}
+
+void debout(char* out) {
+  Serial.println(out);
+}
+
+void debout(String out) {
+  Serial.println(out);
 }
