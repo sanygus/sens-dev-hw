@@ -103,7 +103,7 @@ void loop() {
     }
   }
   volt.readVolt();
-  //debout("analog: " + String(analogRead(A3)) + "        charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
+  debout("analog: " + String(analogRead(A3)) + "        charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
   blink();
   delayms = 1000 - (millis() - startloopmillis);
   if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(1); }
@@ -261,19 +261,35 @@ void modemOn() {
     if (gprsinit_wait > 10) {
       debout("gprsinit_wait REBOOT");
       gprs.powerOff();
+      wdt_reset();
       gprs.powerOn();
       wdt_reset();
       gprsinit_wait = 0;
     }
   }
+  wdt_reset();
   debout("GPRS init!");
   Serial1.println("ATE0");
+  delay(100);
+  modemInit();
+}
+
+void modemInit() {
+  while(sim900_check_with_cmd("AT+SAPBR=2,1\r\n","+SAPBR: 1,3,\"0.0.0.0\"",CMD)) {
+    Serial1.println("AT+SAPBR=1,1");
+    debout("try connect");
+    wdt_reset();
+    delay(1000);
+  }
+  debout("connected");
   delay(1000);
-  Serial1.println("AT+HTTPINIT");
-  delay(3000);
-  wdt_reset();
-  Serial1.println("AT+SAPBR=1,1");
-  delay(3000);
+  while(!sim900_check_with_cmd("AT+HTTPINIT\r\n","OK",CMD)) {
+    debout("HTTPINIT");
+    wdt_reset();
+    delay(1000);
+  }
+  debout("HTTPINITed");
+  delay(1000);
   wdt_reset();
   sendHTTPReq();
 }
@@ -282,6 +298,7 @@ void sendHTTPReq() {
   float charge = volt.getCharge(getParam(0, 1), getParam(2, 3));
   unsigned int devid = getParam(4, 5);
   unsigned int httpport = getParam(6, 7);
+  //sim900_flush_serial();
   Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/heartbeat/" + String(devid) + "/ard?charge=" + String(charge, 3) + "\"");
   delay(1000);
   Serial1.println("AT+HTTPACTION=0");
@@ -344,16 +361,13 @@ void processResp() {
   }
   if (conn_error > 5) {
     wdt_reset();
-    debout("repeat");
+    debout("reinit");
     Serial1.println("AT+SAPBR=0,1");//close
     delay(500);
-    Serial1.println("AT+SAPBR=1,1");
-    delay(3000);
-    Serial1.println("AT+HTTPACTION=0");
-    delay(3000);
-    wdt_reset();
+    modemInit();
     conn_error = 0;
     modem_err++;
+    debout("reinit end");
   }
   if (modem_err > 3) {
     debout("modem reboot");
