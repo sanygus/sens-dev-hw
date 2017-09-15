@@ -12,7 +12,7 @@
 #define PIN_MQ9_HEATER  10
 #define PIN_MIC         A2*/
 #define PIN_VOLT        A3
-#define PIN_RELAY       12
+#define PIN_RELAY       6
 #define SLEEP_DELAY     20
 #define MASTER_QUERY_TIME_THRESHOLD 120
 #define PROCESS_PARITY_VALUE 19
@@ -169,6 +169,7 @@ void receiveHandler(int bc) {
       Wire.read();
     }
   }
+  debout(String(command));
 }
 
 void requestHandler() {
@@ -215,6 +216,7 @@ void requestHandler() {
     EEPROM.write(0, (commandValue >> 8) & 0xFF);
     EEPROM.write(1, commandValue & 0xFF);
     Wire.write(1);
+    debout("EEPROM.writed");
   } else if (command == 6) {//write maxcharge
     EEPROM.write(2, (commandValue >> 8) & 0xFF);
     EEPROM.write(3, commandValue & 0xFF);
@@ -362,6 +364,8 @@ void processResp() {
   if (conn_error > 5) {
     wdt_reset();
     debout("reinit");
+    Serial1.println("AT+HTTPTERM");//close
+    delay(100);
     Serial1.println("AT+SAPBR=0,1");//close
     delay(500);
     modemInit();
