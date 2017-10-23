@@ -38,7 +38,8 @@ byte modem_err = 0;
 byte wakeup_reason = 0;//0-run, 1-end sleep, 2-external(HTTP), 3-external(RING)
 byte process_parity = 0;
 unsigned long startloopmillis = 0;
-unsigned long delayms = 0;
+unsigned long delaydiffms = 0;
+byte delayminussleep = 0;
 
 void setup()
 {
@@ -91,6 +92,7 @@ void loop() {
   }
   if (sleeptime > 0) {
     sleeptime--;
+    debout("sleeptime is " + String(sleeptime));
     if (sleeptime == 0) { wakeup_reason = 1; }
   } else {
     if (sleep_threshold > 0) {
@@ -105,8 +107,7 @@ void loop() {
   volt.readVolt();
   debout("analog: " + String(analogRead(A3)) + "        charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
   blink();
-  delayms = 1000 - (millis() - startloopmillis);
-  if ((delayms >= 0) && (delayms <= 1000)) { delay(delayms); } else { delay(1); }
+  delayCycle();
 }
 
 void blink() {
@@ -118,6 +119,21 @@ void blink() {
     digitalWrite(13, 0);
     delay(100);
     digitalWrite(13, 1);
+  }
+}
+
+void delayCycle() {
+  delaydiffms = millis() - startloopmillis;
+  debout("delaydiffms " + String(delaydiffms));
+  if ((delaydiffms > 1000) && (delaydiffms < 120000)) {
+    delayminussleep = delaydiffms / 1000;
+    debout("delayminussleep " + String(delayminussleep));
+    if (sleeptime > delayminussleep) { sleeptime -= delayminussleep; }
+    delaydiffms -= delayminussleep * 1000;
+  }
+  if (delaydiffms < 1000) {
+    debout("delay " + String(1000 - delaydiffms));
+    delay(1000 - delaydiffms);
   }
 }
 
