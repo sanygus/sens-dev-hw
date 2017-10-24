@@ -279,6 +279,7 @@ void modemOn() {
     if (gprsinit_wait > 10) {
       debout("gprsinit_wait REBOOT");
       gprs.powerOff();
+      relay.on(); delay(500); relay.off();
       wdt_reset();
       gprs.powerOn();
       wdt_reset();
@@ -293,14 +294,18 @@ void modemOn() {
 }
 
 void modemInit() {
+  sim900_check_with_cmd("AT+SAPBR=0,1\r\n","OK",CMD);
+  delay(100);
   while(sim900_check_with_cmd("AT+SAPBR=2,1\r\n","+SAPBR: 1,3,\"0.0.0.0\"",CMD)) {
-    Serial1.println("AT+SAPBR=1,1");
+    sim900_check_with_cmd("AT+SAPBR=1,1\r\n","OK",CMD);
     debout("try connect");
     wdt_reset();
     delay(1000);
   }
   debout("connected");
   delay(1000);
+  sim900_check_with_cmd("AT+HTTPTERM\r\n","OK",CMD);
+  delay(100);
   while(!sim900_check_with_cmd("AT+HTTPINIT\r\n","OK",CMD)) {
     debout("HTTPINIT");
     wdt_reset();
@@ -380,10 +385,6 @@ void processResp() {
   if (conn_error > 5) {
     wdt_reset();
     debout("reinit");
-    Serial1.println("AT+HTTPTERM");//close
-    delay(100);
-    Serial1.println("AT+SAPBR=0,1");//close
-    delay(500);
     modemInit();
     conn_error = 0;
     modem_err++;
