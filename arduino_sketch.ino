@@ -294,17 +294,17 @@ void modemOn() {
 }
 
 void modemInit() {
-  sim900_check_with_cmd("AT+SAPBR=0,1\r\n","OK",CMD);
-  delay(100);
+  sim900_send_cmd("AT+SAPBR=0,1\r\n");
+  delay(500);
   while(sim900_check_with_cmd("AT+SAPBR=2,1\r\n","+SAPBR: 1,3,\"0.0.0.0\"",CMD)) {
-    sim900_check_with_cmd("AT+SAPBR=1,1\r\n","OK",CMD);
+    sim900_check_with_cmd("AT+SAPBR=1,1\r\n","OK", CMD, 20, 20);
     debout("try connect");
     wdt_reset();
-    delay(1000);
+    delay(2000);
   }
   debout("connected");
   delay(1000);
-  sim900_check_with_cmd("AT+HTTPTERM\r\n","OK",CMD);
+  sim900_send_cmd("AT+HTTPTERM\r\n");
   delay(100);
   while(!sim900_check_with_cmd("AT+HTTPINIT\r\n","OK",CMD)) {
     debout("HTTPINIT");
