@@ -1,9 +1,11 @@
 #include <avr/wdt.h>
+#include <Arduino.h>
 #include <EEPROM.h>
 #include <Wire.h>
-#include <Volt.h>
-#include <Relay.h>
-#include <GPRS_Shield_Arduino.h>
+#include "./libraries/Volt/Volt.h"
+#include "./libraries/Relay/Relay.h"
+#include "./libraries/GPRS-Shield/GPRS_Shield_Arduino.h"
+
 /*#include <TroykaMQ.h>
 #include <Mic.h>
 #define PIN_MQ2         A0
@@ -49,13 +51,17 @@ void setup()
   Wire.onRequest(requestHandler);
   pinMode(13, OUTPUT);
   pinMode(PIN_RELAY, OUTPUT);
+  //При включении аврдуино gprs может быть в включенном состоянии поэтому выключаем
   gprs.powerOff();
+  //просто моргаем светодиодом на плате
   digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
   digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
   digitalWrite(13, 1); delay(1000); digitalWrite(13, 0); delay(1000);
   wdt_enable(WDTO_8S);
 
+  //сериал по usb
   Serial.begin(115200);
+  //сериал по gprs
   Serial1.begin(115200);
 
   /*pinMode(PIN_MQ2_HEATER, OUTPUT);
@@ -68,18 +74,25 @@ void loop() {
   startloopmillis = millis();
   wdt_reset();
   //debout("-------------------------");
+  // пришло ли время включать расбери
   if (sleeptime >= sleep_threshold) {
+    //если расбери не включен запускаем процесс включения
     if (!relay.status()) { relay.on(); debout("relay ON"); }
+    
     if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
+    
     if (sleeptime == 0) { master_query_time++; }
     //readSensors();
     debout("working");
     debout("master_query_time: " + String(master_query_time));
   } else { // sleeptime < sleep_threshold
+    //если расбери включен, то вырубаем его
     if (relay.status()) { relay.off(); debout("relay OFF"); }
     /*mq2.heaterPwrOff();
     mq9.heaterPwrOff();*/
+    // если модем включен 
     if (digitalRead(5)) {
+      
       process_parity++;
       if (process_parity >= (PROCESS_PARITY_VALUE - 1)) {
         processResp();
@@ -87,14 +100,18 @@ void loop() {
       }
     } else {
       debout("Modem ON");
+      // процесс включения выключенного модема
       modemOn();
     }
   }
+
+
   if (sleeptime > 0) {
     sleeptime--;
     debout("sleeptime is " + String(sleeptime));
     if (sleeptime == 0) { wakeup_reason = 1; }
   } else {
+    
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
       gprs.powerOff();
@@ -103,21 +120,25 @@ void loop() {
       mq9.cycleHeat();*/
       master_query_time = 0;
     }
+    
   }
+  
   volt.readVolt();
   debout("analog: " + String(analogRead(A3)) + "        charge: " + String(volt.getCharge(getParam(0, 1), getParam(2, 3)), 3));//testing
+  //Светодиодом показываем включен ли расбери или ардуино
   blink();
+  //Дожидаемся конца секунды исходя из переменной который задается в начале loop: startloopmillis
   delayCycle();
 }
 
 void blink() {
   if (relay.status()) {
     digitalWrite(13, 1);
-    delay(100);
+    delay(10);
     digitalWrite(13, 0);
   } else {
     digitalWrite(13, 0);
-    delay(100);
+    delay(10);
     digitalWrite(13, 1);
   }
 }
