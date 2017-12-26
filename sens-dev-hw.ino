@@ -2,10 +2,12 @@
 #include <Arduino.h>
 #include <EEPROM.h>
 #include <Wire.h>
+#include <Sleep_n0m1.h>
 #include "./libraries/Volt/Volt.h"
 #include "./libraries/Relay/Relay.h"
 #include "./libraries/GPRS-Shield/GPRS_Shield_Arduino.h"
-
+Sleep sleep;
+unsigned long sleepTime;
 /*#include <TroykaMQ.h>
 #include <Mic.h>
 #define PIN_MQ2         A0
@@ -19,19 +21,12 @@
 #define MASTER_QUERY_TIME_THRESHOLD 120
 #define PROCESS_PARITY_VALUE 19
 
-/*MQ2 mq2(PIN_MQ2, PIN_MQ2_HEATER);
-MQ9 mq9(PIN_MQ9, PIN_MQ9_HEATER);
-Mic mic(PIN_MIC);*/
 Volt volt(PIN_VOLT);
 Relay relay(PIN_RELAY, 13);
 GPRS gprs(Serial1, 4, 5);
 
 byte command = 0;
 unsigned int commandValue = 0;
-/*unsigned int MQ2[] = {0, 0, 0, 0}; // LPG (пропан-бутан сжиж), Methane (метан), Smoke (дым), Hydrogen (водород) in ppm
-unsigned int MQ9[] = {0, 0, 0}; // LPG, Methane, CarbonMonoxide (угарный газ) in ppm
-boolean mq2_val_ready = false;
-boolean mq9_val_ready = false;*/
 unsigned long sleeptime = 0;
 unsigned long sleep_threshold = 0;
 unsigned long master_query_time = 0;
@@ -63,13 +58,13 @@ void setup()
   Serial.begin(115200);
   //сериал по gprs
   Serial1.begin(115200);
-
-  /*pinMode(PIN_MQ2_HEATER, OUTPUT);
-  pinMode(PIN_MQ9_HEATER, OUTPUT);
-  mq2.heaterPwrHigh();
-  mq9.cycleHeat();*/
+  
 }
 
+//master_query_time если расбери что то отправила то переменная обновляется
+//sleeptime == 0 активный режим
+// sleeptime !=0 спим или готовимся ко сну
+//sleep_threshold =sleeptime-20 сек
 void loop() {
   startloopmillis = millis();
   wdt_reset();
@@ -78,9 +73,10 @@ void loop() {
   if (sleeptime >= sleep_threshold) {
     //если расбери не включен запускаем процесс включения
     if (!relay.status()) { relay.on(); debout("relay ON"); }
-    
+    //
     if (master_query_time >= MASTER_QUERY_TIME_THRESHOLD) { while(1) {}; }
-    
+
+    // 
     if (sleeptime == 0) { master_query_time++; }
     //readSensors();
     debout("working");
@@ -88,11 +84,10 @@ void loop() {
   } else { // sleeptime < sleep_threshold
     //если расбери включен, то вырубаем его
     if (relay.status()) { relay.off(); debout("relay OFF"); }
-    /*mq2.heaterPwrOff();
-    mq9.heaterPwrOff();*/
     // если модем включен 
     if (digitalRead(5)) {
-      
+
+      //на 18-19 секунде выполняем processResp
       process_parity++;
       if (process_parity >= (PROCESS_PARITY_VALUE - 1)) {
         processResp();
@@ -106,18 +101,19 @@ void loop() {
   }
 
 
+// 
   if (sleeptime > 0) {
     sleeptime--;
     debout("sleeptime is " + String(sleeptime));
+    // время сна закончилось и причина сна в виде 1
     if (sleeptime == 0) { wakeup_reason = 1; }
   } else {
-    
+    // переход в активный режим
     if (sleep_threshold > 0) {
       sleep_threshold = 0;
+      //отключаем свой модем
       gprs.powerOff();
       debout("out of sleep");
-      /*mq2.heaterPwrHigh();
-      mq9.cycleHeat();*/
       master_query_time = 0;
     }
     
@@ -144,50 +140,26 @@ void blink() {
 }
 
 void delayCycle() {
+  //вычисляем сколько милисекунд нужно еще ждать
   delaydiffms = millis() - startloopmillis;
   debout("delaydiffms " + String(delaydiffms));
+  // delayDiffms может быть больше секунды?
   if ((delaydiffms > 1000) && (delaydiffms < 120000)) {
     delayminussleep = delaydiffms / 1000;
     debout("delayminussleep " + String(delayminussleep));
     if (sleeptime > delayminussleep) { sleeptime -= delayminussleep; }
     delaydiffms -= delayminussleep * 1000;
   }
+  // ждем сколько нужно
   if (delaydiffms < 1000) {
     debout("delay " + String(1000 - delaydiffms));
-    delay(1000 - delaydiffms);
+    sleep.pwrSaveMode(); //set sleep mode
+  sleep.sleepDelay(1000 - delaydiffms); //sleep for: sleepTime
   }
 }
 
-/*void readSensors() {
-  // MQ-2
-  if (mq2.heatingCompleted()) {
-    if (!mq2.isCalibrated()) {
-      mq2.calibrate();
-    } else {
-      MQ2[0] = mq2.readLPG();
-      MQ2[1] = mq2.readMethane();
-      MQ2[2] = mq2.readSmoke();
-      MQ2[3] = mq2.readHydrogen();
-      mq2_val_ready = true;
-    }
-  }
-  // MQ-9
-  if (mq9.atHeatCycleEnd()) {
-    if (!mq9.isCalibrated()) {
-      mq9.calibrate();
-    } else {
-      MQ9[0] = mq9.readLPG();
-      MQ9[1] = mq9.readMethane();
-      MQ9[2] = mq9.readCarbonMonoxide();
-      mq9_val_ready = true;
-    }
-    mq9.cycleHeat();
-  }
-  // mic
-  mic.readNoise();
-  debout("readSensors");
-}*/
 
+// получаем int(16 бит) переменную из EEPROM
 unsigned int getParam(unsigned int addrH, unsigned int addrL) {
   unsigned int param = EEPROM.read(addrH);
   param = param << 8;
@@ -210,26 +182,7 @@ void receiveHandler(int bc) {
 }
 
 void requestHandler() {
-  /*if (command == 1) {
-    master_query_time = 0;
-    unsigned int mic_val = mic.getNoise();
-    byte data[] = {
-      1,
-      mq2_val_ready,
-      (MQ2[0] >> 8) & 0xFF, MQ2[0] & 0xFF,
-      (MQ2[1] >> 8) & 0xFF, MQ2[1] & 0xFF,
-      (MQ2[2] >> 8) & 0xFF, MQ2[2] & 0xFF,
-      (MQ2[3] >> 8) & 0xFF, MQ2[3] & 0xFF,
-      mq9_val_ready,
-      (MQ9[0] >> 8) & 0xFF, MQ9[0] & 0xFF,
-      (MQ9[1] >> 8) & 0xFF, MQ9[1] & 0xFF,
-      (MQ9[2] >> 8) & 0xFF, MQ9[2] & 0xFF,
-      (mic_val >> 8) & 0xFF, mic_val & 0xFF,
-    };
-    mq2_val_ready = false;
-    mq9_val_ready = false;
-    Wire.write(data, sizeof(data));
-  } else */if (command == 2) {
+if (command == 2) {
     master_query_time = 0;
     if (commandValue > 0) {
       sleeptime = commandValue * 60 - 8;
@@ -338,21 +291,30 @@ void modemInit() {
   sendHTTPReq();
 }
 
+//функция отправляет напряжение устройства на сервер через http
 void sendHTTPReq() {
+  //получаем напряжение
   float charge = volt.getCharge(getParam(0, 1), getParam(2, 3));
+  // получаем id устройства
   unsigned int devid = getParam(4, 5);
+  // получаем порт сервера
   unsigned int httpport = getParam(6, 7);
   //sim900_flush_serial();
+  //отправляем данные на сервер
   Serial1.println("AT+HTTPPARA=\"URL\",\"http://geoworks.pro:" + String(httpport) + "/heartbeat/" + String(devid) + "/ard?charge=" + String(charge, 3) + "\"");
   delay(1000);
+  // устанавливаем, что это GET запрос
   Serial1.println("AT+HTTPACTION=0");
   delay(1000);
+  // сбрасываем таймер
   wdt_reset();
 }
 
 String getResp() {
+  // выделяем строку
   String input = String("                                                                ");
   byte strpos = 0;
+  // если есть что считать с сериал у модема, считаем и возвращаем
   while (Serial1.available() > 0) {
     input[strpos] = Serial1.read();
     strpos++;
@@ -361,7 +323,9 @@ String getResp() {
 }
 
 void processResp() {
+  // смотрим есть ли что от модема
   String tmpResp = getResp();
+  // если модем отправил строку
   if (tmpResp.indexOf(String("+HTTPACTION:")) >= 0) {
     if (tmpResp.indexOf(String(",200,")) >= 0) {
       Serial1.println("AT+HTTPREAD");
