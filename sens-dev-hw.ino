@@ -67,6 +67,12 @@ void setup()
 //sleep_threshold =sleeptime-20 сек
 void loop() {
   startloopmillis = millis();
+  //Устанавливаем настройки сторожевого таймера после сна
+  MCUSR = 0;
+  WDTCSR = 0;
+  wdt_enable(WDTO_8S);
+
+  
   wdt_reset();
   //debout("-------------------------");
   // пришло ли время включать расбери
@@ -153,6 +159,7 @@ void delayCycle() {
   // ждем сколько нужно
   if (delaydiffms < 1000) {
     debout("delay " + String(1000 - delaydiffms));
+    
     sleep.pwrSaveMode(); //set sleep mode
   sleep.sleepDelay(1000 - delaydiffms); //sleep for: sleepTime
   }
@@ -386,9 +393,9 @@ void processResp() {
 }
 
 void debout(char* out) {
-  Serial.println(out);
+  //Serial.println(out);
 }
 
 void debout(String out) {
-  Serial.println(out);
+  //Serial.println(out);
 }
