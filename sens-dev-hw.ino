@@ -3,9 +3,9 @@
 #include <EEPROM.h>
 #include <Wire.h>
 #include <Sleep_n0m1.h>
-#include "./libraries/Volt/Volt.h"
-#include "./libraries/Relay/Relay.h"
-#include "./libraries/GPRS-Shield/GPRS_Shield_Arduino.h"
+#include <Volt.h>
+#include <Relay.h>
+#include <GPRS_Shield_Arduino.h>
 Sleep sleep;
 unsigned long sleepTime;
 /*#include <TroykaMQ.h>
@@ -159,9 +159,12 @@ void delayCycle() {
   // ждем сколько нужно
   if (delaydiffms < 1000) {
     debout("delay " + String(1000 - delaydiffms));
-    
-    sleep.pwrSaveMode(); //set sleep mode
-  sleep.sleepDelay(1000 - delaydiffms); //sleep for: sleepTime
+    if(sleeptime > 0){
+      sleep.pwrDownMode(); //set sleep mode
+      sleep.sleepDelay(1000 - delaydiffms); //sleep for: sleepTime
+    }else{
+      delay(1000 - delaydiffms);
+     }
   }
 }
 
