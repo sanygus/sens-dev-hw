@@ -176,7 +176,7 @@ unsigned int getParam(unsigned int addrH, unsigned int addrL) {
   param = param | EEPROM.read(addrL);
   return param;
 }
-
+//по I2C принимаем команду и параметр и кладём в command и commandValue
 void receiveHandler(int bc) {
   if (Wire.available() == 3) {
     command = Wire.read();//1b//1-getValues,2-doSleep,
@@ -190,7 +190,7 @@ void receiveHandler(int bc) {
   }
   debout(String(command));
 }
-
+//фукнция вызывается, когда RPi отправляет запрос на получение данных
 void requestHandler() {
 if (command == 2) {
     master_query_time = 0;
@@ -249,7 +249,7 @@ if (command == 2) {
   command = 0;
   commandValue = 0;
 }
-
+//включаем модем
 void modemOn() {
   gprs.powerOn();
   wdt_reset();
@@ -276,10 +276,11 @@ void modemOn() {
   delay(100);
   modemInit();
 }
-
+//
 void modemInit() {
   sim900_send_cmd("AT+SAPBR=0,1\r\n");
   delay(500);
+  //ждём подключения к GPRS
   while(sim900_check_with_cmd("AT+SAPBR=2,1\r\n","+SAPBR: 1,3,\"0.0.0.0\"",CMD)) {
     sim900_check_with_cmd("AT+SAPBR=1,1\r\n","OK", CMD, 20, 20);
     debout("try connect");
@@ -290,6 +291,7 @@ void modemInit() {
   delay(1000);
   sim900_send_cmd("AT+HTTPTERM\r\n");
   delay(100);
+  //ожидаем готовоность HTTP модуля
   while(!sim900_check_with_cmd("AT+HTTPINIT\r\n","OK",CMD)) {
     debout("HTTPINIT");
     wdt_reset();
@@ -321,7 +323,7 @@ void sendHTTPReq() {
 }
 
 String getResp() {
-  // выделяем строку
+  // выделяем паямть для строки ответа
   String input = String("                                                                ");
   byte strpos = 0;
   // если есть что считать с сериал у модема, считаем и возвращаем
@@ -380,12 +382,14 @@ void processResp() {
   if (conn_error > 5) {
     wdt_reset();
     debout("reinit");
+    //если ошибка подключения > 5 раз, то переинциализируем модем
     modemInit();
     conn_error = 0;
     modem_err++;
     debout("reinit end");
   }
   if (modem_err > 3) {
+    //если ошибка модема > 3, перезагружаем модем
     debout("modem reboot");
     gprs.powerOff();
     wdt_reset();
