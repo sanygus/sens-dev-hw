@@ -3,8 +3,8 @@
 
 Relay::Relay(int pin_r, int pin_led)
 {
-  _pin_r = pin_r;
-  _pin_led = pin_led;
+  _pin_r = pin_r;//пин реле
+  _pin_led = pin_led;//пин светодиода
 }
 
 void Relay::on()
